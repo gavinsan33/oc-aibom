@@ -95,42 +95,52 @@ type Dataset struct {
 	AutoDetected []AutoDetectedDataset `json:"auto_detected"`
 }
 
+// Training's numeric fields use FlexInt/FlexFloat: postprocess.py's
+// detect_trl_from_command falls back to the raw CLI string on a failed
+// int()/float() conversion instead of dropping the field.
 type Training struct {
-	Optimizer               string  `json:"optimizer"`
-	LearningRate            float64 `json:"learning_rate"`
-	BatchSize               int     `json:"batch_size"`
-	Epochs                  int     `json:"epochs"`
-	RandomSeed              int     `json:"random_seed"`
-	ParallelizationStrategy string  `json:"parallelization_strategy"`
+	Optimizer               string    `json:"optimizer"`
+	LearningRate            FlexFloat `json:"learning_rate"`
+	BatchSize               FlexInt   `json:"batch_size"`
+	Epochs                  FlexInt   `json:"epochs"`
+	RandomSeed              FlexInt   `json:"random_seed"`
+	ParallelizationStrategy string    `json:"parallelization_strategy"`
 }
 
 type FineTuning struct {
-	AdaptationMethod string `json:"adaptation_method"`
-	LoRARank         int    `json:"lora_rank"`
-	LoRAAlpha        int    `json:"lora_alpha"`
+	AdaptationMethod string  `json:"adaptation_method"`
+	LoRARank         FlexInt `json:"lora_rank"`
+	LoRAAlpha        FlexInt `json:"lora_alpha"`
 }
 
+// Inference's numeric fields (other than MaxTokens, which is always parsed
+// via _try_int from an annotation) use FlexInt/FlexFloat for the same
+// reason as Training: detect_vllm_from_command falls back to the raw CLI
+// string on a failed conversion.
 type Inference struct {
-	ServingEngine        string  `json:"serving_engine"`
-	MaxModelLen          int     `json:"max_model_len"`
-	TensorParallelSize   int     `json:"tensor_parallel_size"`
-	PipelineParallelSize int     `json:"pipeline_parallel_size"`
-	EnableExpertParallel bool    `json:"enable_expert_parallel"`
-	DataParallelSize     int     `json:"data_parallel_size"`
-	GPUMemoryUtilization float64 `json:"gpu_memory_utilization"`
-	Temperature          float64 `json:"temperature"`
-	TopP                 float64 `json:"top_p"`
-	TopK                 int     `json:"top_k"`
-	MaxTokens            int     `json:"max_tokens"`
+	ServingEngine        string    `json:"serving_engine"`
+	MaxModelLen          FlexInt   `json:"max_model_len"`
+	TensorParallelSize   FlexInt   `json:"tensor_parallel_size"`
+	PipelineParallelSize FlexInt   `json:"pipeline_parallel_size"`
+	EnableExpertParallel bool      `json:"enable_expert_parallel"`
+	DataParallelSize     FlexInt   `json:"data_parallel_size"`
+	GPUMemoryUtilization FlexFloat `json:"gpu_memory_utilization"`
+	Temperature          FlexFloat `json:"temperature"`
+	TopP                 FlexFloat `json:"top_p"`
+	TopK                 FlexInt   `json:"top_k"`
+	MaxTokens            int       `json:"max_tokens"`
 }
 
+// GPUCount, CPUCores, and NUMANodes use FlexInt: they're read straight from
+// `grep`/`nproc`-style shell command stdout in generate_snapshot.py, with no
+// int() cast applied before landing in spec.data.
 type Environment struct {
 	GPUType          string  `json:"gpu_type"`
-	GPUCount         int     `json:"gpu_count"`
+	GPUCount         FlexInt `json:"gpu_count"`
 	CPUModel         string  `json:"cpu_model"`
-	CPUCores         int     `json:"cpu_cores"`
+	CPUCores         FlexInt `json:"cpu_cores"`
 	MemoryGB         float64 `json:"memory_gb"`
-	NUMANodes        int     `json:"numa_nodes"`
+	NUMANodes        FlexInt `json:"numa_nodes"`
 	CUDAVersion      string  `json:"cuda_version"`
 	DriverVersion    string  `json:"driver_version"`
 	FrameworkVersion string  `json:"framework_version"`
