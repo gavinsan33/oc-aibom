@@ -83,6 +83,15 @@ same connection flags `oc`/`kubectl` themselves do: `--kubeconfig`,
 `--context`, `--namespace`/`-n`, `--server`, `--token`, etc. — no
 plugin-specific config needed.
 
+## Color output
+
+Table headers are bold, `diff`'s Delta/Change columns are green (increase)
+or red (decrease), and `describe` highlights dataset-drift mismatches
+(red) and a dirty git checkout (yellow). Color is automatically disabled
+when stdout isn't a terminal (piped to a file, `less`, etc.), and can be
+turned off explicitly with `--no-color` or by setting `NO_COLOR` (see
+[no-color.org](https://no-color.org/)).
+
 ## Implementation notes
 
 There is no generated Go clientset for the `AIBOM` custom resource (it's

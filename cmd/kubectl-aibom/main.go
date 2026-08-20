@@ -21,11 +21,16 @@ import (
 func main() {
 	configFlags := genericclioptions.NewConfigFlags(true)
 
+	var noColor bool
 	root := &cobra.Command{
 		Use:   "aibom",
 		Short: "List, inspect, and compare AIBOM custom resources",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			initColor(noColor)
+		},
 	}
 	configFlags.AddFlags(root.PersistentFlags())
+	root.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 
 	var allNamespaces bool
 	var modelFilter, intentFilter, quantFilter string
@@ -180,14 +185,14 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-	header := "NAME\tJOB\tMODEL\tINTENT\tQUANTIZATION\tGPU TYPE\tCOLLECTED AT"
+	cols := []string{"NAME", "JOB", "MODEL", "INTENT", "QUANTIZATION", "GPU TYPE", "COLLECTED AT"}
 	if allNamespaces {
-		header = "NAMESPACE\t" + header
+		cols = append([]string{"NAMESPACE"}, cols...)
 	}
 	if metricHeader != "" {
-		header += "\t" + metricHeader
+		cols = append(cols, metricHeader)
 	}
-	fmt.Fprintln(w, header)
+	fmt.Fprintln(w, boldRow(cols...))
 
 	for _, a := range items {
 		row := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s",
@@ -225,26 +230,30 @@ func printDescribe(a aibom.AIBOM) {
 	fmt.Printf("Experiment Intent: %s\n", a.ExperimentIntent)
 	fmt.Printf("Collected At:      %s\n", a.CollectedAt)
 	fmt.Println()
-	fmt.Println("Model:")
+	fmt.Println(bold("Model:"))
 	fmt.Printf("  Name:          %s\n", a.Data.Model.Name)
 	fmt.Printf("  Version:       %s\n", a.Data.Model.Version)
 	fmt.Printf("  Architecture:  %s\n", a.Data.Model.Architecture)
 	fmt.Printf("  Framework:     %s\n", a.Data.Model.Framework)
 	fmt.Printf("  Quantization:  %s (%d-bit)\n", a.Data.Model.Quantization, a.Data.Model.QuantizationBits)
 	fmt.Println()
-	fmt.Println("Dataset:")
+	fmt.Println(bold("Dataset:"))
 	fmt.Printf("  Declared:      %s %s (license: %s)\n", a.Data.Dataset.Declared.Name, a.Data.Dataset.Declared.Version, a.Data.Dataset.Declared.License)
 	for _, d := range a.Data.Dataset.AutoDetected {
-		match := "matches declared"
+		match := green("matches declared")
 		if !d.MatchesDeclared {
-			match = "DOES NOT MATCH DECLARED"
+			match = red("DOES NOT MATCH DECLARED")
 		}
 		fmt.Printf("  Auto-detected: %s %s (license: %s) — %s\n", d.DatasetName, d.Version, d.License, match)
 	}
 	fmt.Println()
-	fmt.Println("Source:")
+	fmt.Println(bold("Source:"))
 	fmt.Printf("  Repository:    %s\n", a.Data.SourceCode.GitRepository)
-	fmt.Printf("  Commit:        %s (branch: %s, dirty: %v)\n", a.Data.SourceCode.GitCommit, a.Data.SourceCode.GitBranch, a.Data.SourceCode.Dirty)
+	dirty := fmt.Sprintf("%v", a.Data.SourceCode.Dirty)
+	if a.Data.SourceCode.Dirty {
+		dirty = yellow(dirty)
+	}
+	fmt.Printf("  Commit:        %s (branch: %s, dirty: %s)\n", a.Data.SourceCode.GitCommit, a.Data.SourceCode.GitBranch, dirty)
 	fmt.Println()
 	fmt.Println("Environment:")
 	fmt.Printf("  GPU:           %s x%d\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount)
@@ -276,7 +285,7 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 		fmt.Printf("No differences found between %s and %s (across compared config/metadata fields).\n", nameA, nameB)
 	} else {
 		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-		fmt.Fprintf(w, "FIELD\t%s\t%s\n", nameA, nameB)
+		fmt.Fprintln(w, boldRow("FIELD", nameA, nameB))
 		for _, d := range diffs {
 			fmt.Fprintf(w, "%s\t%s\t%s\n", d.Field, d.A, d.B)
 		}
@@ -284,12 +293,14 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 	}
 
 	fmt.Println()
-	fmt.Println("Performance:")
+	fmt.Println(bold("Performance:"))
 	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-	fmt.Fprintf(w, "METRIC\t%s\t%s\tDELTA\tCHANGE\n", nameA, nameB)
+	fmt.Fprintln(w, boldRow("METRIC", nameA, nameB, "DELTA", "CHANGE"))
 	for _, m := range metrics {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%+.2f\t%s\n",
-			m.Metric, formatMetric(m.A), formatMetric(m.B), m.Delta, formatPctChange(m.PctChange))
+		delta := colorBySign(m.Delta, fmt.Sprintf("%+.2f", m.Delta))
+		change := colorBySign(m.PctChange, formatPctChange(m.PctChange))
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			m.Metric, formatMetric(m.A), formatMetric(m.B), delta, change)
 	}
 	w.Flush()
 }
@@ -297,11 +308,12 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 func printCompare(items []aibom.AIBOM) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
 
-	names := make([]string, len(items))
+	headerCells := make([]string, len(items)+1)
+	headerCells[0] = "FIELD"
 	for i, a := range items {
-		names[i] = a.Name
+		headerCells[i+1] = a.Name
 	}
-	fmt.Fprintln(w, "FIELD\t"+strings.Join(names, "\t"))
+	fmt.Fprintln(w, boldRow(headerCells...))
 
 	row := func(label string, values func(aibom.AIBOM) string) {
 		cells := make([]string, len(items))
