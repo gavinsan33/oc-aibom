@@ -1,0 +1,48 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: aibom
+spec:
+  version: v0.1.0
+  homepage: https://github.com/gavinsan33/oc-aibom
+  shortDescription: List, inspect, and compare AIBOM custom resources
+  description: |
+    oc-aibom makes it easier to filter through and compare AIBOM
+    (aibom.io/v1alpha1) custom resources than raw `oc get aibom -o yaml`,
+    using only the standard Kubernetes API.
+
+    Usage:
+      kubectl aibom list [-A] [--model=...] [--intent=...] [--quantization=...] [--drift-only]
+      kubectl aibom describe <name>
+      kubectl aibom diff <name-a> <name-b>
+  caveats: |
+    Requires read access to aiboms.aibom.io in the target namespace(s).
+  platforms:
+  - selector:
+      matchLabels:
+        os: linux
+        arch: amd64
+    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_linux_amd64.tar.gz
+    sha256: REPLACE_ME
+    bin: kubectl-aibom
+  - selector:
+      matchLabels:
+        os: linux
+        arch: arm64
+    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_linux_arm64.tar.gz
+    sha256: REPLACE_ME
+    bin: kubectl-aibom
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: amd64
+    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_darwin_amd64.tar.gz
+    sha256: REPLACE_ME
+    bin: kubectl-aibom
+  - selector:
+      matchLabels:
+        os: darwin
+        arch: arm64
+    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_darwin_arm64.tar.gz
+    sha256: REPLACE_ME
+    bin: kubectl-aibom
