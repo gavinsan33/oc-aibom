@@ -3,7 +3,7 @@ kind: Plugin
 metadata:
   name: aibom
 spec:
-  version: v0.1.0
+  version: v0.1.1
   homepage: https://github.com/gavinsan33/oc-aibom
   shortDescription: List, inspect, and compare AIBOM custom resources
   description: |
@@ -22,27 +22,27 @@ spec:
       matchLabels:
         os: linux
         arch: amd64
-    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_linux_amd64.tar.gz
-    sha256: 91fb180f323a2a18a29b85b7801018718632b20e4d2bf1f52d1977dd0818f046
+    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.1/kubectl-aibom_v0.1.1_linux_amd64.tar.gz
+    sha256: 2cc351854b7871f367973266ba6142ca9a27f53e2ef4c9ec971a63cb26b78bfa
     bin: kubectl-aibom
   - selector:
       matchLabels:
         os: linux
         arch: arm64
-    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_linux_arm64.tar.gz
-    sha256: f7c80f675d421a4457210ef39c49c1f761d7ef313e431ee820d95f96ca5c0997
+    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.1/kubectl-aibom_v0.1.1_linux_arm64.tar.gz
+    sha256: 6a0d927f6a42b4147c86f94e2ed6e39cfacc7e80a91aacd056292b4b734eb832
     bin: kubectl-aibom
   - selector:
       matchLabels:
         os: darwin
         arch: amd64
-    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_darwin_amd64.tar.gz
-    sha256: 410a40411dfe0e566dfab3737a669b0730088ee343b2723e963c8323e9f79846
+    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.1/kubectl-aibom_v0.1.1_darwin_amd64.tar.gz
+    sha256: f737618b2f3af0b28a226cb4f728153452daea50d6197213df8272d4fcfdbffe
     bin: kubectl-aibom
   - selector:
       matchLabels:
         os: darwin
         arch: arm64
-    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_darwin_arm64.tar.gz
-    sha256: efa91567e2828fff96113347e418412ab70c0f711ff0cd3042f6262ceb305544
+    uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.1/kubectl-aibom_v0.1.1_darwin_arm64.tar.gz
+    sha256: dff1e652cf5bd94ad7e1ffd9d1308fe939f9962d0e349b1c3d634c532fe783be
     bin: kubectl-aibom
