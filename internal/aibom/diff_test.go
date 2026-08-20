@@ -1,6 +1,9 @@
 package aibom
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func findDiff(diffs []FieldDiff, field string) (FieldDiff, bool) {
 	for _, d := range diffs {
@@ -61,5 +64,53 @@ func TestDiffEnvironment(t *testing.T) {
 	}
 	if _, ok := findDiff(diffs, "environment.gpu_count"); !ok {
 		t.Fatalf("expected environment.gpu_count diff, got %+v", diffs)
+	}
+}
+
+func findMetric(diffs []MetricDiff, metric string) (MetricDiff, bool) {
+	for _, d := range diffs {
+		if d.Metric == metric {
+			return d, true
+		}
+	}
+	return MetricDiff{}, false
+}
+
+func TestDiffPerformanceComputesDeltaAndPctChange(t *testing.T) {
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 50}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 75}}}
+	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
+	if !ok {
+		t.Fatalf("expected avg_gpu_utilization_pct metric")
+	}
+	if m.A != 50 || m.B != 75 || m.Delta != 25 {
+		t.Fatalf("unexpected metric: %+v", m)
+	}
+	if m.PctChange != 50 {
+		t.Fatalf("expected +50%% change, got %v", m.PctChange)
+	}
+}
+
+func TestDiffPerformanceZeroBaselineIsNaN(t *testing.T) {
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUPowerWatts: 0}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUPowerWatts: 100}}}
+	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_power_watts")
+	if !ok {
+		t.Fatalf("expected avg_gpu_power_watts metric")
+	}
+	if !math.IsNaN(m.PctChange) {
+		t.Fatalf("expected NaN pct change with zero baseline, got %v", m.PctChange)
+	}
+	if m.Delta != 100 {
+		t.Fatalf("expected delta 100, got %v", m.Delta)
+	}
+}
+
+func TestDiffPerformanceReturnsAllMetricsEvenIfUnchanged(t *testing.T) {
+	a := AIBOM{}
+	b := AIBOM{}
+	metrics := DiffPerformance(a, b)
+	if len(metrics) != len(performanceMetrics) {
+		t.Fatalf("expected %d metrics, got %d", len(performanceMetrics), len(metrics))
 	}
 }

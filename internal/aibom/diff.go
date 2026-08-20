@@ -1,12 +1,68 @@
 package aibom
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // FieldDiff is a single field that differs between two AIBOMs.
 type FieldDiff struct {
 	Field string
 	A     string
 	B     string
+}
+
+// MetricDiff is a quantified comparison of one resource_utilization metric
+// between two AIBOMs. PctChange is relative to A; it is NaN when A is zero
+// (division by zero), which callers should render as "N/A".
+type MetricDiff struct {
+	Metric    string
+	A         float64
+	B         float64
+	Delta     float64 // B - A
+	PctChange float64 // (B - A) / A * 100
+}
+
+// metricSpec names a resource_utilization field and how to extract it, so
+// DiffPerformance and the compare table can share one definition of "which
+// metrics matter" instead of drifting apart.
+type metricSpec struct {
+	Name string
+	Get  func(ResourceUtilization) float64
+}
+
+var performanceMetrics = []metricSpec{
+	{"avg_gpu_utilization_pct", func(r ResourceUtilization) float64 { return r.AvgGPUUtilizationPct }},
+	{"avg_gpu_memory_used_mib", func(r ResourceUtilization) float64 { return r.AvgGPUMemoryUsedMiB }},
+	{"avg_gpu_power_watts", func(r ResourceUtilization) float64 { return r.AvgGPUPowerWatts }},
+	{"avg_cpu_usage_cores", func(r ResourceUtilization) float64 { return r.AvgCPUUsageCores }},
+	{"avg_memory_usage_gb", func(r ResourceUtilization) float64 { return r.AvgMemoryUsageGB }},
+	{"avg_network_receive_mbps", func(r ResourceUtilization) float64 { return r.AvgNetworkReceiveMbps }},
+	{"avg_network_transmit_mbps", func(r ResourceUtilization) float64 { return r.AvgNetworkTransmitMbps }},
+}
+
+// DiffPerformance quantifies the change in each resource_utilization metric
+// from a to b. Unlike Diff, it always returns one entry per metric (even
+// when unchanged), since "no change" is itself a useful performance-compare
+// result, not something to omit.
+func DiffPerformance(a, b AIBOM) []MetricDiff {
+	diffs := make([]MetricDiff, 0, len(performanceMetrics))
+	for _, m := range performanceMetrics {
+		av := m.Get(a.Data.ResourceUtilization)
+		bv := m.Get(b.Data.ResourceUtilization)
+		pct := math.NaN()
+		if av != 0 {
+			pct = (bv - av) / av * 100
+		}
+		diffs = append(diffs, MetricDiff{
+			Metric:    m.Name,
+			A:         av,
+			B:         bv,
+			Delta:     bv - av,
+			PctChange: pct,
+		})
+	}
+	return diffs
 }
 
 // Diff compares the fields most useful for spotting drift between two runs:

@@ -31,6 +31,7 @@ Either way, invoke it as a plugin:
 oc aibom list
 oc aibom describe <name>
 oc aibom diff <name-a> <name-b>
+oc aibom compare <name> <name> [<name>...]
 ```
 
 ## Usage
@@ -47,20 +48,33 @@ oc aibom list --model=granite-3.0-8b        # filter by model.name
 oc aibom list --intent=sft                  # training | sft | inference
 oc aibom list --quantization=int4
 oc aibom list --drift-only                  # auto-detected dataset != declared dataset
+oc aibom list --sort-by=gpu-utilization     # rank by a performance metric (highest first)
+oc aibom list --sort-by=gpu-power --ascending
 ```
+
+`--sort-by` accepts: `gpu-utilization`, `gpu-memory`, `gpu-power`,
+`cpu-usage`, `memory-usage`, `network-rx`, `network-tx` — and adds the
+corresponding column to the table.
 
 ### `oc aibom describe <name>`
 
 Prints a human-readable summary of a single AIBOM's model, dataset
-(declared vs. auto-detected, flagging mismatches), source provenance, and
-environment — instead of a raw YAML dump.
+(declared vs. auto-detected, flagging mismatches), source provenance,
+environment, and resource utilization (GPU/CPU/memory/network averages,
+plus any Grafana links) — instead of a raw YAML dump.
 
 ### `oc aibom diff <name-a> <name-b>`
 
 Field-by-field comparison of two AIBOMs: model config, dataset
-declaration/drift, git provenance, and hardware/driver environment. Useful
-for answering "what changed between this run and the last one" without
-diffing full YAML documents by hand.
+declaration/drift, git provenance, and hardware/driver environment, plus a
+quantified performance table (value, delta, and percent change) across GPU
+utilization/memory/power, CPU/memory usage, and network throughput.
+
+### `oc aibom compare <name> <name> [<name>...]`
+
+Side-by-side performance table across two or more AIBOMs — one column per
+run — for spotting trends across a run history rather than just a single
+pairwise diff.
 
 ## Standard flags
 
@@ -82,8 +96,11 @@ structs mirroring `compile_aibom()`'s output for typed filtering/diffing.
 Pushing a `v*` tag runs `.github/workflows/release.yaml`, which builds
 cross-platform archives with `make dist` and publishes them as a GitHub
 release. `plugins/aibom.yaml` is the krew manifest for this repo's index —
-update its `sha256` fields from `dist/checksums.txt` after cutting a
-release.
+after cutting a release, update its `sha256` fields from the **release's own
+`checksums.txt` asset** (`gh release download <tag> -p checksums.txt`), not
+from a local `make dist` rebuild — Go builds aren't bit-for-bit reproducible
+across different checkout paths, so a locally-built tarball's hash won't
+match the one CI actually published.
 
 To test the manifest locally before/without a release:
 

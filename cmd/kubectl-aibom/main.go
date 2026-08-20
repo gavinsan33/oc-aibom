@@ -6,7 +6,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -28,6 +30,8 @@ func main() {
 	var allNamespaces bool
 	var modelFilter, intentFilter, quantFilter string
 	var driftOnly bool
+	var sortBy string
+	var ascending bool
 	listCmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls", "get"},
@@ -53,7 +57,12 @@ func main() {
 			if driftOnly {
 				items = aibom.DriftOnly(items)
 			}
-			printList(items, allNamespaces)
+			if sortBy != "" {
+				if err := aibom.SortByMetric(items, sortBy, ascending); err != nil {
+					return err
+				}
+			}
+			printList(items, allNamespaces, sortBy)
 			return nil
 		},
 	}
@@ -62,6 +71,8 @@ func main() {
 	listCmd.Flags().StringVar(&intentFilter, "intent", "", "filter by experiment intent (training|sft|inference)")
 	listCmd.Flags().StringVar(&quantFilter, "quantization", "", "filter by model.quantization")
 	listCmd.Flags().BoolVar(&driftOnly, "drift-only", false, "only show AIBOMs where auto-detected dataset(s) disagree with the declared dataset")
+	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric: gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx (highest first)")
+	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first)")
 
 	getCmd := &cobra.Command{
 		Use:   "describe <name>",
@@ -99,12 +110,35 @@ func main() {
 			if err != nil {
 				return err
 			}
-			printDiff(args[0], args[1], aibom.Diff(a, b))
+			printDiff(args[0], args[1], aibom.Diff(a, b), aibom.DiffPerformance(a, b))
 			return nil
 		},
 	}
 
-	root.AddCommand(listCmd, getCmd, diffCmd)
+	compareCmd := &cobra.Command{
+		Use:   "compare <name> <name> [<name>...]",
+		Short: "Show performance metrics for two or more AIBOMs side by side",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, namespace, err := buildClient(configFlags)
+			if err != nil {
+				return err
+			}
+			ctx := context.Background()
+			items := make([]aibom.AIBOM, 0, len(args))
+			for _, name := range args {
+				a, err := aibom.Get(ctx, client, namespace, name)
+				if err != nil {
+					return err
+				}
+				items = append(items, a)
+			}
+			printCompare(items)
+			return nil
+		},
+	}
+
+	root.AddCommand(listCmd, getCmd, diffCmd, compareCmd)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -128,27 +162,60 @@ func buildClient(configFlags *genericclioptions.ConfigFlags) (dynamic.Interface,
 	return client, namespace, nil
 }
 
-func printList(items []aibom.AIBOM, allNamespaces bool) {
+// metricLabels are the display headers for aibom.SortableMetrics keys.
+var metricLabels = map[string]string{
+	"gpu-utilization": "GPU UTIL %",
+	"gpu-memory":      "GPU MEM MIB",
+	"gpu-power":       "GPU POWER W",
+	"cpu-usage":       "CPU CORES",
+	"memory-usage":    "MEM GB",
+	"network-rx":      "NET RX MBPS",
+	"network-tx":      "NET TX MBPS",
+}
+
+func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
+	metricHeader, metricGet := "", aibom.SortableMetrics[sortBy]
+	if sortBy != "" {
+		metricHeader = metricLabels[sortBy]
+	}
+
 	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+	header := "NAME\tJOB\tMODEL\tINTENT\tQUANTIZATION\tGPU TYPE\tCOLLECTED AT"
 	if allNamespaces {
-		fmt.Fprintln(w, "NAMESPACE\tNAME\tJOB\tMODEL\tINTENT\tQUANTIZATION\tGPU TYPE\tCOLLECTED AT")
-		for _, a := range items {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				a.Namespace, a.Name, a.JobName, a.Data.Model.Name, a.ExperimentIntent,
-				a.Data.Model.Quantization, a.Data.Environment.GPUType, a.CollectedAt)
+		header = "NAMESPACE\t" + header
+	}
+	if metricHeader != "" {
+		header += "\t" + metricHeader
+	}
+	fmt.Fprintln(w, header)
+
+	for _, a := range items {
+		row := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s",
+			a.Name, a.JobName, a.Data.Model.Name, a.ExperimentIntent,
+			a.Data.Model.Quantization, a.Data.Environment.GPUType, a.CollectedAt)
+		if allNamespaces {
+			row = a.Namespace + "\t" + row
 		}
-	} else {
-		fmt.Fprintln(w, "NAME\tJOB\tMODEL\tINTENT\tQUANTIZATION\tGPU TYPE\tCOLLECTED AT")
-		for _, a := range items {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				a.Name, a.JobName, a.Data.Model.Name, a.ExperimentIntent,
-				a.Data.Model.Quantization, a.Data.Environment.GPUType, a.CollectedAt)
+		if metricGet != nil {
+			row += "\t" + formatMetric(metricGet(a.Data.ResourceUtilization))
 		}
+		fmt.Fprintln(w, row)
 	}
 	w.Flush()
 	if len(items) == 0 {
 		fmt.Println("No AIBOMs found.")
 	}
+}
+
+func formatMetric(v float64) string {
+	return fmt.Sprintf("%.2f", v)
+}
+
+func formatPctChange(v float64) string {
+	if math.IsNaN(v) {
+		return "N/A"
+	}
+	return fmt.Sprintf("%+.1f%%", v)
 }
 
 func printDescribe(a aibom.AIBOM) {
@@ -183,17 +250,91 @@ func printDescribe(a aibom.AIBOM) {
 	fmt.Printf("  GPU:           %s x%d\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount)
 	fmt.Printf("  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
 	fmt.Printf("  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
+	fmt.Println()
+	fmt.Println("Performance:")
+	ru := a.Data.ResourceUtilization
+	if ru.Note != "" {
+		fmt.Printf("  %s\n", ru.Note)
+	} else {
+		fmt.Printf("  GPU Utilization: %.2f%%\n", ru.AvgGPUUtilizationPct)
+		fmt.Printf("  GPU Memory Used: %.2f MiB\n", ru.AvgGPUMemoryUsedMiB)
+		fmt.Printf("  GPU Power:       %.2f W\n", ru.AvgGPUPowerWatts)
+		fmt.Printf("  CPU Usage:       %.2f cores\n", ru.AvgCPUUsageCores)
+		fmt.Printf("  Memory Usage:    %.2f GB\n", ru.AvgMemoryUsageGB)
+		fmt.Printf("  Network RX/TX:   %.2f / %.2f Mbps\n", ru.AvgNetworkReceiveMbps, ru.AvgNetworkTransmitMbps)
+		if ru.SummaryIncludesColdStart {
+			fmt.Println("  (includes cold start)")
+		}
+		for _, link := range ru.GrafanaLinks {
+			fmt.Printf("  Grafana:         %s\n", link)
+		}
+	}
 }
 
-func printDiff(nameA, nameB string, diffs []aibom.FieldDiff) {
+func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.MetricDiff) {
 	if len(diffs) == 0 {
-		fmt.Printf("No differences found between %s and %s (across compared fields).\n", nameA, nameB)
-		return
+		fmt.Printf("No differences found between %s and %s (across compared config/metadata fields).\n", nameA, nameB)
+	} else {
+		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+		fmt.Fprintf(w, "FIELD\t%s\t%s\n", nameA, nameB)
+		for _, d := range diffs {
+			fmt.Fprintf(w, "%s\t%s\t%s\n", d.Field, d.A, d.B)
+		}
+		w.Flush()
 	}
+
+	fmt.Println()
+	fmt.Println("Performance:")
 	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-	fmt.Fprintf(w, "FIELD\t%s\t%s\n", nameA, nameB)
-	for _, d := range diffs {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", d.Field, d.A, d.B)
+	fmt.Fprintf(w, "METRIC\t%s\t%s\tDELTA\tCHANGE\n", nameA, nameB)
+	for _, m := range metrics {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%+.2f\t%s\n",
+			m.Metric, formatMetric(m.A), formatMetric(m.B), m.Delta, formatPctChange(m.PctChange))
+	}
+	w.Flush()
+}
+
+func printCompare(items []aibom.AIBOM) {
+	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+
+	names := make([]string, len(items))
+	for i, a := range items {
+		names[i] = a.Name
+	}
+	fmt.Fprintln(w, "FIELD\t"+strings.Join(names, "\t"))
+
+	row := func(label string, values func(aibom.AIBOM) string) {
+		cells := make([]string, len(items))
+		for i, a := range items {
+			cells[i] = values(a)
+		}
+		fmt.Fprintln(w, label+"\t"+strings.Join(cells, "\t"))
+	}
+
+	row("Model", func(a aibom.AIBOM) string { return a.Data.Model.Name })
+	row("Quantization", func(a aibom.AIBOM) string { return a.Data.Model.Quantization })
+	row("Intent", func(a aibom.AIBOM) string { return a.ExperimentIntent })
+	row("GPU Type", func(a aibom.AIBOM) string { return a.Data.Environment.GPUType })
+	fmt.Fprintln(w)
+
+	for _, m := range []struct {
+		label string
+		get   func(aibom.ResourceUtilization) float64
+	}{
+		{"GPU Utilization %", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUUtilizationPct }},
+		{"GPU Memory (MiB)", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUMemoryUsedMiB }},
+		{"GPU Power (W)", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUPowerWatts }},
+		{"CPU Usage (cores)", func(r aibom.ResourceUtilization) float64 { return r.AvgCPUUsageCores }},
+		{"Memory Usage (GB)", func(r aibom.ResourceUtilization) float64 { return r.AvgMemoryUsageGB }},
+		{"Network RX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.AvgNetworkReceiveMbps }},
+		{"Network TX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.AvgNetworkTransmitMbps }},
+	} {
+		row(m.label, func(a aibom.AIBOM) string {
+			if a.Data.ResourceUtilization.Note != "" {
+				return "-"
+			}
+			return formatMetric(m.get(a.Data.ResourceUtilization))
+		})
 	}
 	w.Flush()
 }
