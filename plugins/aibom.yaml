@@ -23,26 +23,26 @@ spec:
         os: linux
         arch: amd64
     uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_linux_amd64.tar.gz
-    sha256: REPLACE_ME
+    sha256: 4c5435e524cf01c3ff766ecbe98a43dc371029fcaa27e6a93cdf3b61dbf94e05
     bin: kubectl-aibom
   - selector:
       matchLabels:
         os: linux
         arch: arm64
     uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_linux_arm64.tar.gz
-    sha256: REPLACE_ME
+    sha256: 359de1779224e3ada4d51274db74493cb41f9d39c5256f095e306ac75468e44a
     bin: kubectl-aibom
   - selector:
       matchLabels:
         os: darwin
         arch: amd64
     uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_darwin_amd64.tar.gz
-    sha256: REPLACE_ME
+    sha256: 74b05ae478b14ac35ff05a54cef6d60350f66921e78c4cf3046110b73d5712cd
     bin: kubectl-aibom
   - selector:
       matchLabels:
         os: darwin
         arch: arm64
     uri: https://github.com/gavinsan33/oc-aibom/releases/download/v0.1.0/kubectl-aibom_v0.1.0_darwin_arm64.tar.gz
-    sha256: REPLACE_ME
+    sha256: 96c30571c3e815256f2f2ae05b26829e8b38b2db56bd84d921ca0476fba264a3
     bin: kubectl-aibom
