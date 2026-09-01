@@ -34,6 +34,9 @@ func main() {
 
 	var allNamespaces bool
 	var modelFilter, intentFilter, quantFilter string
+	var architectureFilter, frameworkFilter, gpuTypeFilter string
+	var jobFilter, gitBranchFilter, gitRepoFilter string
+	var servingEngineFilter, adaptationMethodFilter, optimizerFilter string
 	var driftOnly bool
 	var sortBy string
 	var ascending bool
@@ -55,9 +58,18 @@ func main() {
 				return err
 			}
 			items = aibom.Apply(items, aibom.Filter{
-				Model:        modelFilter,
-				Intent:       intentFilter,
-				Quantization: quantFilter,
+				Model:            modelFilter,
+				Intent:           intentFilter,
+				Quantization:     quantFilter,
+				Architecture:     architectureFilter,
+				Framework:        frameworkFilter,
+				GPUType:          gpuTypeFilter,
+				JobName:          jobFilter,
+				GitBranch:        gitBranchFilter,
+				GitRepository:    gitRepoFilter,
+				ServingEngine:    servingEngineFilter,
+				AdaptationMethod: adaptationMethodFilter,
+				Optimizer:        optimizerFilter,
 			})
 			if driftOnly {
 				items = aibom.DriftOnly(items)
@@ -75,6 +87,15 @@ func main() {
 	listCmd.Flags().StringVar(&modelFilter, "model", "", "filter by model.name")
 	listCmd.Flags().StringVar(&intentFilter, "intent", "", "filter by experiment intent (training|sft|inference)")
 	listCmd.Flags().StringVar(&quantFilter, "quantization", "", "filter by model.quantization")
+	listCmd.Flags().StringVar(&architectureFilter, "architecture", "", "filter by model.architecture")
+	listCmd.Flags().StringVar(&frameworkFilter, "framework", "", "filter by model.framework")
+	listCmd.Flags().StringVar(&gpuTypeFilter, "gpu-type", "", "filter by environment.gpu_type")
+	listCmd.Flags().StringVar(&jobFilter, "job", "", "filter by job name")
+	listCmd.Flags().StringVar(&gitBranchFilter, "git-branch", "", "filter by source_code.git_branch")
+	listCmd.Flags().StringVar(&gitRepoFilter, "git-repository", "", "filter by source_code.git_repository")
+	listCmd.Flags().StringVar(&servingEngineFilter, "serving-engine", "", "filter by inference.serving_engine")
+	listCmd.Flags().StringVar(&adaptationMethodFilter, "adaptation-method", "", "filter by fine_tuning.adaptation_method")
+	listCmd.Flags().StringVar(&optimizerFilter, "optimizer", "", "filter by training.optimizer")
 	listCmd.Flags().BoolVar(&driftOnly, "drift-only", false, "only show AIBOMs where auto-detected dataset(s) disagree with the declared dataset")
 	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric: gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx (highest first)")
 	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first)")

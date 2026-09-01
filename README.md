@@ -47,12 +47,22 @@ oc aibom list -A                            # all namespaces
 oc aibom list --model=granite-3.0-8b        # filter by model.name
 oc aibom list --intent=sft                  # training | sft | inference
 oc aibom list --quantization=int4
+oc aibom list --architecture=llama          # filter by model.architecture
+oc aibom list --framework=vllm              # filter by model.framework
+oc aibom list --gpu-type=A100               # filter by environment.gpu_type
+oc aibom list --job=my-training-job         # filter by job name
+oc aibom list --git-branch=main             # filter by source_code.git_branch
+oc aibom list --git-repository=my-org/repo  # filter by source_code.git_repository
+oc aibom list --serving-engine=vllm         # filter by inference.serving_engine
+oc aibom list --adaptation-method=lora      # filter by fine_tuning.adaptation_method
+oc aibom list --optimizer=adamw             # filter by training.optimizer
 oc aibom list --drift-only                  # auto-detected dataset != declared dataset
 oc aibom list --sort-by=gpu-utilization     # rank by a performance metric (highest first)
 oc aibom list --sort-by=gpu-power --ascending
 ```
 
-`--sort-by` accepts: `gpu-utilization`, `gpu-memory`, `gpu-power`,
+All filters are exact-match, case-insensitive, and can be combined (AND'd
+together). `--sort-by` accepts: `gpu-utilization`, `gpu-memory`, `gpu-power`,
 `cpu-usage`, `memory-usage`, `network-rx`, `network-tx` — and adds the
 corresponding column to the table.
 
