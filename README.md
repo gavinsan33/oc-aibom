@@ -91,14 +91,22 @@ corresponding column to the table.
 Prints a human-readable summary of a single AIBOM's model, dataset
 (declared vs. auto-detected, flagging mismatches), source provenance,
 environment, and resource utilization (GPU/CPU/memory/network averages,
-plus any Grafana links) — instead of a raw YAML dump.
+plus any Grafana links) — instead of a raw YAML dump. If the AIBOM was
+compiled with per-metric detail (aibom-webhook-service's segmented telemetry
+stats — see its `CLAUDE.md`), a "Performance Detail" section also shows each
+metric's min/avg/max/p95 and its first→middle→last-third breakdown across
+the run, with a trend arrow (↑/↓/→) flagging runs that ramped up, throttled
+down, or held steady — something a single run-wide average can't show.
 
 ### `oc aibom diff <name-a> <name-b>`
 
 Field-by-field comparison of two AIBOMs: model config, dataset
 declaration/drift, git provenance, and hardware/driver environment, plus a
 quantified performance table (value, delta, and percent change) across GPU
-utilization/memory/power, CPU/memory usage, and network throughput.
+utilization/memory/power, CPU/memory usage, and network throughput. When
+segmented telemetry stats are available, each run's own value is annotated
+with its within-run trend arrow — distinct from the delta/change columns,
+which only compare the two runs' averages against each other.
 
 ### `oc aibom compare <name> <name> [<name>...]`
 

@@ -14,31 +14,46 @@ type FieldDiff struct {
 
 // MetricDiff is a quantified comparison of one resource_utilization metric
 // between two AIBOMs. PctChange is relative to A; it is NaN when A is zero
-// (division by zero), which callers should render as "N/A".
+// (division by zero), which callers should render as "N/A". TrendA/TrendB
+// are each run's own within-run trend ("up"/"down"/"flat"/"") -- an axis
+// distinct from Delta/PctChange, which only compares the two runs' averages
+// and says nothing about whether either run was steady or drifting.
 type MetricDiff struct {
 	Metric    string
 	A         float64
 	B         float64
 	Delta     float64 // B - A
 	PctChange float64 // (B - A) / A * 100
+	TrendA    string
+	TrendB    string
 }
 
 // metricSpec names a resource_utilization field and how to extract it, so
 // DiffPerformance and the compare table can share one definition of "which
-// metrics matter" instead of drifting apart.
+// metrics matter" instead of drifting apart. RawKey is the corresponding key
+// into ResourceUtilization.Metrics, used to look up segment/trend detail.
 type metricSpec struct {
-	Name string
-	Get  func(ResourceUtilization) float64
+	Name   string
+	RawKey string
+	Get    func(ResourceUtilization) float64
 }
 
 var performanceMetrics = []metricSpec{
-	{"avg_gpu_utilization_pct", func(r ResourceUtilization) float64 { return r.AvgGPUUtilizationPct }},
-	{"avg_gpu_memory_used_mib", func(r ResourceUtilization) float64 { return r.AvgGPUMemoryUsedMiB }},
-	{"avg_gpu_power_watts", func(r ResourceUtilization) float64 { return r.AvgGPUPowerWatts }},
-	{"avg_cpu_usage_cores", func(r ResourceUtilization) float64 { return r.AvgCPUUsageCores }},
-	{"avg_memory_usage_gb", func(r ResourceUtilization) float64 { return r.AvgMemoryUsageGB }},
-	{"avg_network_receive_mbps", func(r ResourceUtilization) float64 { return r.AvgNetworkReceiveMbps }},
-	{"avg_network_transmit_mbps", func(r ResourceUtilization) float64 { return r.AvgNetworkTransmitMbps }},
+	{"avg_gpu_utilization_pct", "gpu_utilization", func(r ResourceUtilization) float64 { return r.AvgGPUUtilizationPct }},
+	{"avg_gpu_memory_used_mib", "gpu_memory_used", func(r ResourceUtilization) float64 { return r.AvgGPUMemoryUsedMiB }},
+	{"avg_gpu_power_watts", "gpu_power", func(r ResourceUtilization) float64 { return r.AvgGPUPowerWatts }},
+	{"avg_cpu_usage_cores", "cpu_usage", func(r ResourceUtilization) float64 { return r.AvgCPUUsageCores }},
+	{"avg_memory_usage_gb", "memory_usage", func(r ResourceUtilization) float64 { return r.AvgMemoryUsageGB }},
+	{"avg_network_receive_mbps", "network_receive", func(r ResourceUtilization) float64 { return r.AvgNetworkReceiveMbps }},
+	{"avg_network_transmit_mbps", "network_transmit", func(r ResourceUtilization) float64 { return r.AvgNetworkTransmitMbps }},
+}
+
+func trendFor(r ResourceUtilization, rawKey string) string {
+	stats, ok := r.Metrics[rawKey]
+	if !ok {
+		return ""
+	}
+	return stats.Segments.Trend()
 }
 
 // DiffPerformance quantifies the change in each resource_utilization metric
@@ -60,6 +75,8 @@ func DiffPerformance(a, b AIBOM) []MetricDiff {
 			B:         bv,
 			Delta:     bv - av,
 			PctChange: pct,
+			TrendA:    trendFor(a.Data.ResourceUtilization, m.RawKey),
+			TrendB:    trendFor(b.Data.ResourceUtilization, m.RawKey),
 		})
 	}
 	return diffs

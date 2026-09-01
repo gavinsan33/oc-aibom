@@ -148,17 +148,68 @@ type Environment struct {
 }
 
 type ResourceUtilization struct {
-	CollectedAt              string   `json:"collected_at"`
-	AvgGPUUtilizationPct     float64  `json:"avg_gpu_utilization_pct"`
-	AvgGPUMemoryUsedMiB      float64  `json:"avg_gpu_memory_used_mib"`
-	AvgGPUPowerWatts         float64  `json:"avg_gpu_power_watts"`
-	AvgCPUUsageCores         float64  `json:"avg_cpu_usage_cores"`
-	AvgMemoryUsageGB         float64  `json:"avg_memory_usage_gb"`
-	AvgNetworkReceiveMbps    float64  `json:"avg_network_receive_mbps"`
-	AvgNetworkTransmitMbps   float64  `json:"avg_network_transmit_mbps"`
-	GrafanaLinks             []string `json:"grafana_links"`
-	SummaryIncludesColdStart bool     `json:"summary_includes_cold_start"`
-	Note                     string   `json:"note"`
+	CollectedAt              string                 `json:"collected_at"`
+	AvgGPUUtilizationPct     float64                `json:"avg_gpu_utilization_pct"`
+	AvgGPUMemoryUsedMiB      float64                `json:"avg_gpu_memory_used_mib"`
+	AvgGPUPowerWatts         float64                `json:"avg_gpu_power_watts"`
+	AvgCPUUsageCores         float64                `json:"avg_cpu_usage_cores"`
+	AvgMemoryUsageGB         float64                `json:"avg_memory_usage_gb"`
+	AvgNetworkReceiveMbps    float64                `json:"avg_network_receive_mbps"`
+	AvgNetworkTransmitMbps   float64                `json:"avg_network_transmit_mbps"`
+	GrafanaLinks             []string               `json:"grafana_links"`
+	SummaryIncludesColdStart bool                   `json:"summary_includes_cold_start"`
+	Note                     string                 `json:"note"`
+	Metrics                  map[string]MetricStats `json:"metrics"`
+}
+
+// MetricSegments is a first/middle/last-third breakdown of one telemetry
+// metric's average across a run. A pointer is used because a segment can be
+// legitimately absent (a run too short to fill three slices) rather than
+// zero -- see compute_metric_stats() in aibom-webhook-service's
+// postprocess.py.
+type MetricSegments struct {
+	FirstThird  *float64 `json:"first_third"`
+	MiddleThird *float64 `json:"middle_third"`
+	LastThird   *float64 `json:"last_third"`
+}
+
+// Trend summarizes whether a metric rose, fell, or held steady between the
+// first and last third of a single run -- something a run-wide average
+// can't show. Returns "" when there isn't enough segment data to say.
+func (s MetricSegments) Trend() string {
+	if s.FirstThird == nil || s.LastThird == nil {
+		return ""
+	}
+	first, last := *s.FirstThird, *s.LastThird
+	if first == 0 {
+		if last == 0 {
+			return "flat"
+		}
+		return "up"
+	}
+	switch pctChange := (last - first) / first * 100; {
+	case pctChange > 10:
+		return "up"
+	case pctChange < -10:
+		return "down"
+	default:
+		return "flat"
+	}
+}
+
+// MetricStats is the full min/max/avg/p95/segments breakdown of one
+// telemetry metric across a run, as compiled by postprocess.py's
+// compute_metric_stats(). Keyed in ResourceUtilization.Metrics by the same
+// names as aibom-webhook-service's TELEMETRY_QUERIES: gpu_utilization,
+// gpu_memory_used, gpu_power, cpu_usage, memory_usage, network_receive,
+// network_transmit.
+type MetricStats struct {
+	Unit     string         `json:"unit"`
+	Min      float64        `json:"min"`
+	Max      float64        `json:"max"`
+	Avg      float64        `json:"avg"`
+	P95      float64        `json:"p95"`
+	Segments MetricSegments `json:"segments"`
 }
 
 type Metadata struct {

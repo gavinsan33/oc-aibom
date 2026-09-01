@@ -114,3 +114,42 @@ func TestDiffPerformanceReturnsAllMetricsEvenIfUnchanged(t *testing.T) {
 		t.Fatalf("expected %d metrics, got %d", len(performanceMetrics), len(metrics))
 	}
 }
+
+func f(v float64) *float64 { return &v }
+
+func TestDiffPerformanceCarriesPerRunTrend(t *testing.T) {
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
+		AvgGPUUtilizationPct: 50,
+		Metrics: map[string]MetricStats{
+			"gpu_utilization": {Segments: MetricSegments{FirstThird: f(90), LastThird: f(10)}},
+		},
+	}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
+		AvgGPUUtilizationPct: 50,
+		Metrics: map[string]MetricStats{
+			"gpu_utilization": {Segments: MetricSegments{FirstThird: f(10), LastThird: f(90)}},
+		},
+	}}}
+	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
+	if !ok {
+		t.Fatalf("expected avg_gpu_utilization_pct metric")
+	}
+	if m.TrendA != "down" {
+		t.Fatalf("expected TrendA=down, got %q", m.TrendA)
+	}
+	if m.TrendB != "up" {
+		t.Fatalf("expected TrendB=up, got %q", m.TrendB)
+	}
+}
+
+func TestDiffPerformanceTrendEmptyWhenMetricMissing(t *testing.T) {
+	a := AIBOM{}
+	b := AIBOM{}
+	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
+	if !ok {
+		t.Fatalf("expected avg_gpu_utilization_pct metric")
+	}
+	if m.TrendA != "" || m.TrendB != "" {
+		t.Fatalf("expected empty trends with no Metrics data, got %q / %q", m.TrendA, m.TrendB)
+	}
+}

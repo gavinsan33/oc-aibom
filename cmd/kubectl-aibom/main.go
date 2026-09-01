@@ -232,6 +232,55 @@ var metricLabels = map[string]string{
 	"network-tx":      "NET TX MBPS",
 }
 
+// telemetryMetricOrder and telemetryMetricLabels give a fixed display order
+// and label for ResourceUtilization.Metrics, which is keyed by the same raw
+// names as aibom-webhook-service's TELEMETRY_QUERIES (a Go map has no
+// inherent order).
+var telemetryMetricOrder = []string{
+	"gpu_utilization", "gpu_memory_used", "gpu_power",
+	"cpu_usage", "memory_usage", "network_receive", "network_transmit",
+}
+
+var telemetryMetricLabels = map[string]string{
+	"gpu_utilization":  "GPU Utilization",
+	"gpu_memory_used":  "GPU Memory",
+	"gpu_power":        "GPU Power",
+	"cpu_usage":        "CPU Usage",
+	"memory_usage":     "Memory Usage",
+	"network_receive":  "Network RX",
+	"network_transmit": "Network TX",
+}
+
+// trendArrowParts returns a trend arrow as both plain text (visible, for
+// column-width calculation) and colorized text (rendered, for display) --
+// see the cell type's doc comment in color.go for why these must differ.
+func trendArrowParts(trend string) (visible, rendered string) {
+	switch trend {
+	case "up":
+		return "↑", yellow("↑")
+	case "down":
+		return "↓", yellow("↓")
+	case "flat":
+		return "→", "→"
+	default:
+		return "", ""
+	}
+}
+
+// trendArrow is trendArrowParts' rendered form, for plain (non-table) output
+// like printMetricDetail where there's no column alignment to protect.
+func trendArrow(trend string) string {
+	_, rendered := trendArrowParts(trend)
+	return rendered
+}
+
+func formatSegment(v *float64) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.2f", *v)
+}
+
 func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 	metricHeader, metricGet := "", aibom.SortableMetrics[sortBy]
 	if sortBy != "" {
@@ -331,6 +380,31 @@ func printDescribe(a aibom.AIBOM) {
 		for _, link := range ru.GrafanaLinks {
 			fmt.Printf("  Grafana:         %s\n", link)
 		}
+		printMetricDetail(ru)
+	}
+}
+
+// printMetricDetail prints the min/max/p95 and within-run shape for each
+// metric in ru.Metrics -- detail a flat average can't show, e.g. whether GPU
+// utilization held steady or throttled down partway through the run. Silent
+// no-op if the AIBOM predates this field (an older postprocess.py).
+func printMetricDetail(ru aibom.ResourceUtilization) {
+	if len(ru.Metrics) == 0 {
+		return
+	}
+	fmt.Println()
+	fmt.Println(bold("Performance Detail (min / avg / max / p95, first→mid→last third of run):"))
+	for _, key := range telemetryMetricOrder {
+		m, ok := ru.Metrics[key]
+		if !ok {
+			continue
+		}
+		fmt.Printf(
+			"  %-16s %.2f / %.2f / %.2f / %.2f %-13s  %s → %s → %s %s\n",
+			telemetryMetricLabels[key]+":", m.Min, m.Avg, m.Max, m.P95, m.Unit,
+			formatSegment(m.Segments.FirstThird), formatSegment(m.Segments.MiddleThird), formatSegment(m.Segments.LastThird),
+			trendArrow(m.Segments.Trend()),
+		)
 	}
 }
 
@@ -356,13 +430,28 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 		changeText := formatPctChange(m.PctChange)
 		rows = append(rows, []cell{
 			labelCell(m.Metric),
-			plainCell(formatMetric(m.A)),
-			plainCell(formatMetric(m.B)),
+			metricCellWithTrend(m.A, m.TrendA),
+			metricCellWithTrend(m.B, m.TrendB),
 			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
 			coloredCell(changeText, colorBySign(m.PctChange, changeText)),
 		})
 	}
 	writeTable(os.Stdout, rows)
+}
+
+// metricCellWithTrend appends a within-run trend arrow (see
+// MetricSegments.Trend) to a metric value, when known -- e.g. "75.00 ↓"
+// flags that a run's own average was still dropping as it progressed, a
+// distinction the cross-run delta/change columns can't make on their own.
+// Built as a cell (not a plain string) so the arrow's color escape codes
+// don't get counted by writeTable's column-width calculation.
+func metricCellWithTrend(v float64, trend string) cell {
+	text := formatMetric(v)
+	visibleArrow, renderedArrow := trendArrowParts(trend)
+	if visibleArrow == "" {
+		return plainCell(text)
+	}
+	return coloredCell(text+" "+visibleArrow, text+" "+renderedArrow)
 }
 
 func printCompare(items []aibom.AIBOM) {
