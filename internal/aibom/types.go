@@ -4,6 +4,8 @@
 // training/fine-tuning/inference workload.
 package aibom
 
+import "math"
+
 // AIBOM mirrors the schema-enforced top-level fields of an AIBOM custom
 // resource's spec, plus the free-form spec.data document (preserved
 // unknown fields in the CRD, compiled by postprocess.py's compile_aibom()).
@@ -173,21 +175,46 @@ type MetricSegments struct {
 	LastThird   *float64 `json:"last_third"`
 }
 
-// Trend summarizes whether a metric rose, fell, or held steady between the
-// first and last third of a single run -- something a run-wide average
-// can't show. Returns "" when there isn't enough segment data to say.
+// segmentPctChange is (to-from)/from*100, with a from-is-zero fallback so a
+// move away from (or between) all-zero segments still has a sign instead of
+// dividing by zero.
+func segmentPctChange(from, to float64) float64 {
+	if from == 0 {
+		switch {
+		case to == 0:
+			return 0
+		case to > 0:
+			return 100
+		default:
+			return -100
+		}
+	}
+	return (to - from) / from * 100
+}
+
+// Trend summarizes the shape of a metric across a single run's first/middle/
+// last thirds -- something a run-wide average can't show. Returns "" when
+// there isn't enough segment data to say.
 func (s MetricSegments) Trend() string {
 	if s.FirstThird == nil || s.LastThird == nil {
 		return ""
 	}
 	first, last := *s.FirstThird, *s.LastThird
-	if first == 0 {
-		if last == 0 {
-			return "flat"
+
+	if s.MiddleThird != nil {
+		firstToMid := segmentPctChange(first, *s.MiddleThird)
+		midToLast := segmentPctChange(*s.MiddleThird, last)
+		// Dipped then recovered, or spiked then dropped back: first->mid and
+		// mid->last moved in opposite directions, each past the same 10%
+		// threshold used for up/down below. Comparing only first vs. last
+		// would call a 100->50->100 run "flat" even though it was anything
+		// but steady in between.
+		if firstToMid*midToLast < 0 && math.Abs(firstToMid) > 10 && math.Abs(midToLast) > 10 {
+			return "volatile"
 		}
-		return "up"
 	}
-	switch pctChange := (last - first) / first * 100; {
+
+	switch pctChange := segmentPctChange(first, last); {
 	case pctChange > 10:
 		return "up"
 	case pctChange < -10:

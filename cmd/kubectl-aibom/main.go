@@ -260,6 +260,8 @@ func trendArrowParts(trend string) (visible, rendered string) {
 		return "↑", yellow("↑")
 	case "down":
 		return "↓", yellow("↓")
+	case "volatile":
+		return "⇝", yellow("⇝")
 	case "flat":
 		return "→", "→"
 	default:
