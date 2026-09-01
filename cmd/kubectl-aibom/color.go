@@ -1,19 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/term"
 )
 
-// ANSI codes are chosen to all be the same byte length (5 bytes: "\x1b[3Xm")
-// so that, wherever we colorize every cell in a text/tabwriter column, the
-// invisible overhead is uniform across that column and doesn't throw off
-// tabwriter's width-based padding (it counts escape-code bytes as visible
-// width, so mixing colored and uncolored cells in the same column would
-// misalign them; coloring an entire column with equal-length codes does
-// not, since it just inflates that column's padding uniformly).
 const (
 	ansiReset     = "\x1b[0m"
 	ansiBold      = "\x1b[1m"
@@ -51,19 +47,7 @@ func colorize(code, s string) string {
 
 func bold(s string) string { return colorize(ansiBold, s) }
 
-// boldRow wraps each cell individually (not the joined line) so the
-// literal tab bytes between cells stay outside any escape sequence.
-func boldRow(cells ...string) string {
-	bolded := make([]string, len(cells))
-	for i, c := range cells {
-		bolded[i] = bold(c)
-	}
-	return strings.Join(bolded, "\t")
-}
-
-// colorBySign colorizes s green/red/default-fg depending on the sign of v,
-// using equal-length codes (see the const block above) so a whole column
-// of these stays aligned under tabwriter.
+// colorBySign colorizes s green/red/default-fg depending on the sign of v.
 func colorBySign(v float64, s string) string {
 	switch {
 	case v > 0:
@@ -78,3 +62,59 @@ func colorBySign(v float64, s string) string {
 func yellow(s string) string { return colorize(ansiYellow, s) }
 func red(s string) string    { return colorize(ansiRed, s) }
 func green(s string) string  { return colorize(ansiGreen, s) }
+
+// cell is one table cell: visible is the plain, uncolored text used to
+// compute column widths, and rendered is what actually gets printed (which
+// may wrap visible in ANSI codes). Column widths must be computed from
+// visible, not rendered — text/tabwriter counts escape-code bytes as
+// visible width, which misaligns columns whenever some cells in a column
+// are colorized and others aren't (e.g. a bold header over plain data).
+type cell struct {
+	visible  string
+	rendered string
+}
+
+func plainCell(s string) cell { return cell{visible: s, rendered: s} }
+
+func coloredCell(visible, rendered string) cell { return cell{visible: visible, rendered: rendered} }
+
+func plainRow(values ...string) []cell {
+	row := make([]cell, len(values))
+	for i, v := range values {
+		row[i] = plainCell(v)
+	}
+	return row
+}
+
+func headerRow(values ...string) []cell {
+	row := make([]cell, len(values))
+	for i, v := range values {
+		row[i] = coloredCell(v, bold(v))
+	}
+	return row
+}
+
+// writeTable prints rows padded to align columns, using each cell's visible
+// text to compute widths so ANSI-colorized cells never throw off alignment.
+func writeTable(w io.Writer, rows [][]cell) {
+	var widths []int
+	for _, row := range rows {
+		for i, c := range row {
+			for len(widths) <= i {
+				widths = append(widths, 0)
+			}
+			if l := utf8.RuneCountInString(c.visible); l > widths[i] {
+				widths[i] = l
+			}
+		}
+	}
+	for _, row := range rows {
+		for i, c := range row {
+			fmt.Fprint(w, c.rendered)
+			if i < len(row)-1 {
+				fmt.Fprint(w, strings.Repeat(" ", widths[i]-utf8.RuneCountInString(c.visible)+2))
+			}
+		}
+		fmt.Fprintln(w)
+	}
+}
