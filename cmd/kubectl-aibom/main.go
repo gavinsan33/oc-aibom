@@ -267,13 +267,6 @@ func trendArrowParts(trend string) (visible, rendered string) {
 	}
 }
 
-// trendArrow is trendArrowParts' rendered form, for plain (non-table) output
-// like printMetricDetail where there's no column alignment to protect.
-func trendArrow(trend string) string {
-	_, rendered := trendArrowParts(trend)
-	return rendered
-}
-
 func formatSegment(v *float64) string {
 	if v == nil {
 		return "-"
@@ -387,25 +380,37 @@ func printDescribe(a aibom.AIBOM) {
 // printMetricDetail prints the min/max/p95 and within-run shape for each
 // metric in ru.Metrics -- detail a flat average can't show, e.g. whether GPU
 // utilization held steady or throttled down partway through the run. Silent
-// no-op if the AIBOM predates this field (an older postprocess.py).
+// no-op if the AIBOM predates this field (an older postprocess.py). Rendered
+// as a table (not manually padded Printf columns) since the values span
+// wildly different magnitudes across metrics (e.g. "28.00" vs "20500.00"),
+// which fixed-width padding can't keep aligned.
 func printMetricDetail(ru aibom.ResourceUtilization) {
 	if len(ru.Metrics) == 0 {
 		return
 	}
 	fmt.Println()
-	fmt.Println(bold("Performance Detail (min / avg / max / p95, first→mid→last third of run):"))
+	fmt.Println(bold("Performance Detail:"))
+	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "P95", "UNIT", "1ST THIRD -> MID -> LAST")}
 	for _, key := range telemetryMetricOrder {
 		m, ok := ru.Metrics[key]
 		if !ok {
 			continue
 		}
-		fmt.Printf(
-			"  %-16s %.2f / %.2f / %.2f / %.2f %-13s  %s → %s → %s %s\n",
-			telemetryMetricLabels[key]+":", m.Min, m.Avg, m.Max, m.P95, m.Unit,
+		segmentsText := fmt.Sprintf(
+			"%s -> %s -> %s",
 			formatSegment(m.Segments.FirstThird), formatSegment(m.Segments.MiddleThird), formatSegment(m.Segments.LastThird),
-			trendArrow(m.Segments.Trend()),
 		)
+		rows = append(rows, []cell{
+			labelCell(telemetryMetricLabels[key]),
+			plainCell(formatMetric(m.Min)),
+			plainCell(formatMetric(m.Avg)),
+			plainCell(formatMetric(m.Max)),
+			plainCell(formatMetric(m.P95)),
+			plainCell(m.Unit),
+			withTrendArrow(segmentsText, m.Segments.Trend()),
+		})
 	}
+	writeTable(os.Stdout, rows)
 }
 
 func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.MetricDiff) {
@@ -443,10 +448,15 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 // MetricSegments.Trend) to a metric value, when known -- e.g. "75.00 ↓"
 // flags that a run's own average was still dropping as it progressed, a
 // distinction the cross-run delta/change columns can't make on their own.
-// Built as a cell (not a plain string) so the arrow's color escape codes
-// don't get counted by writeTable's column-width calculation.
 func metricCellWithTrend(v float64, trend string) cell {
-	text := formatMetric(v)
+	return withTrendArrow(formatMetric(v), trend)
+}
+
+// withTrendArrow appends a within-run trend arrow (see MetricSegments.Trend)
+// to text, when known. Built as a cell (not a plain string) so the arrow's
+// color escape codes don't get counted by writeTable's column-width
+// calculation.
+func withTrendArrow(text, trend string) cell {
 	visibleArrow, renderedArrow := trendArrowParts(trend)
 	if visibleArrow == "" {
 		return plainCell(text)
