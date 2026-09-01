@@ -34,6 +34,26 @@ oc aibom diff <name-a> <name-b>
 oc aibom compare <name> <name> [<name>...]
 ```
 
+### Shell completion
+
+`kubectl`/`oc` don't call a plugin's own `__complete` command directly —
+they look on `PATH` for a companion executable named `kubectl_complete-aibom`
+(or `oc_complete-aibom`), and silently fall back to filename completion if
+it's missing. `make install` installs both companion scripts (from
+`completion/`) alongside the binary, so `oc aibom <TAB>` and
+`oc aibom list --<TAB>` work out of the box for source installs, as long as
+your shell has `oc`'s (or `kubectl`'s) own completion sourced, e.g.:
+
+```sh
+source <(oc completion zsh)   # or: source <(oc completion bash)
+```
+
+krew installs don't get this automatically — krew only symlinks the
+manifest's `bin:` entry onto `PATH`, not the completion scripts bundled in
+the release tarball. To enable completion for a krew install, copy the
+extracted `kubectl_complete-aibom`/`oc_complete-aibom` files (from
+`~/.krew/store/aibom/<version>/`) into `~/.krew/bin` yourself.
+
 ## Usage
 
 ### `oc aibom list`
@@ -123,9 +143,9 @@ kubectl krew install --manifest=plugins/aibom.yaml --archive=dist/kubectl-aibom_
 ## Makefile targets
 
 - `make build` — build `./kubectl-aibom`
-- `make install` — build and install to `/usr/local/bin` (or `INSTALL_DIR`)
-- `make uninstall` — remove the installed binary from `INSTALL_DIR`
-- `make dist` — cross-compile release tarballs + `checksums.txt` into `dist/` for krew
+- `make install` — build and install the binary + shell-completion companion scripts to `/usr/local/bin` (or `INSTALL_DIR`)
+- `make uninstall` — remove the installed binary + completion scripts from `INSTALL_DIR`
+- `make dist` — cross-compile release tarballs (binary + completion scripts) + `checksums.txt` into `dist/` for krew
 - `make test` — run unit tests
 - `make vet` — run `go vet`
 - `make check` — `vet` + `test`

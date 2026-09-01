@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Companion executable kubectl/oc's plugin completion mechanism looks for
+# on PATH (named kubectl_complete-<plugin> / oc_complete-<plugin>) — it
+# does not call a plugin binary's own `__complete` directly. This just
+# forwards to it.
+# https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/#optionally-add-a-plugin-completion-file
+exec kubectl-aibom __complete "$@"
