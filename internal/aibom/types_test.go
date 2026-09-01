@@ -31,3 +31,28 @@ func TestMetricSegmentsTrend(t *testing.T) {
 		})
 	}
 }
+
+func TestMetricSegmentsSparkline(t *testing.T) {
+	cases := []struct {
+		name             string
+		first, mid, last *float64
+		want             string
+	}{
+		{"dip then recover", f(100), f(50), f(100), "↘↗"},
+		{"spike then drop", f(10), f(100), f(10), "↗↘"},
+		{"steady climb", f(10), f(50), f(90), "↗↗"},
+		{"steady decline", f(90), f(50), f(10), "↘↘"},
+		{"flat", f(50), f(51), f(52), "→→"},
+		{"missing middle", f(10), nil, f(90), ""},
+		{"missing first", nil, f(50), f(90), ""},
+		{"missing last", f(10), f(50), nil, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			seg := MetricSegments{FirstThird: c.first, MiddleThird: c.mid, LastThird: c.last}
+			if got := seg.Sparkline(); got != c.want {
+				t.Fatalf("Sparkline() = %q, want %q", got, c.want)
+			}
+		})
+	}
+}

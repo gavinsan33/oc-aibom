@@ -251,21 +251,14 @@ var telemetryMetricLabels = map[string]string{
 	"network_transmit": "Network TX",
 }
 
-// trendArrowParts returns a trend arrow as both plain text (visible, for
-// column-width calculation) and colorized text (rendered, for display) --
-// see the cell type's doc comment in color.go for why these must differ.
-func trendArrowParts(trend string) (visible, rendered string) {
+// trendIsNotable reports whether a Trend() verdict is worth visually
+// flagging -- anything but a steady run or missing data.
+func trendIsNotable(trend string) bool {
 	switch trend {
-	case "up":
-		return "↑", yellow("↑")
-	case "down":
-		return "↓", yellow("↓")
-	case "volatile":
-		return "⇝", yellow("⇝")
-	case "flat":
-		return "→", "→"
+	case "up", "down", "volatile":
+		return true
 	default:
-		return "", ""
+		return false
 	}
 }
 
@@ -392,7 +385,7 @@ func printMetricDetail(ru aibom.ResourceUtilization) {
 	}
 	fmt.Println()
 	fmt.Println(bold("Performance Detail:"))
-	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "P95", "UNIT", "1ST THIRD -> MID -> LAST")}
+	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "P95", "UNIT", "1ST -> MID -> LAST", "SHAPE")}
 	for _, key := range telemetryMetricOrder {
 		m, ok := ru.Metrics[key]
 		if !ok {
@@ -409,7 +402,8 @@ func printMetricDetail(ru aibom.ResourceUtilization) {
 			plainCell(formatMetric(m.Max)),
 			plainCell(formatMetric(m.P95)),
 			plainCell(m.Unit),
-			withTrendArrow(segmentsText, m.Segments.Trend()),
+			plainCell(segmentsText),
+			shapeCell(m.Segments.Sparkline(), m.Segments.Trend()),
 		})
 	}
 	writeTable(os.Stdout, rows)
@@ -437,8 +431,8 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 		changeText := formatPctChange(m.PctChange)
 		rows = append(rows, []cell{
 			labelCell(m.Metric),
-			metricCellWithTrend(m.A, m.TrendA),
-			metricCellWithTrend(m.B, m.TrendB),
+			metricCellWithShape(m.A, m.ShapeA, m.TrendA),
+			metricCellWithShape(m.B, m.ShapeB, m.TrendB),
 			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
 			coloredCell(changeText, colorBySign(m.PctChange, changeText)),
 		})
@@ -446,24 +440,45 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 	writeTable(os.Stdout, rows)
 }
 
-// metricCellWithTrend appends a within-run trend arrow (see
-// MetricSegments.Trend) to a metric value, when known -- e.g. "75.00 ↓"
-// flags that a run's own average was still dropping as it progressed, a
-// distinction the cross-run delta/change columns can't make on their own.
-func metricCellWithTrend(v float64, trend string) cell {
-	return withTrendArrow(formatMetric(v), trend)
+// metricCellWithShape appends a within-run arrow sparkline (see
+// MetricSegments.Sparkline) to a metric value, when known -- e.g. "75.00 ↘↗"
+// flags that a run's own average dipped then recovered, a distinction the
+// cross-run delta/change columns can't make on their own.
+func metricCellWithShape(v float64, shape, trend string) cell {
+	if shape == "" {
+		return plainCell(formatMetric(v))
+	}
+	return joinShapeCell(formatMetric(v), shape, trend)
 }
 
-// withTrendArrow appends a within-run trend arrow (see MetricSegments.Trend)
-// to text, when known. Built as a cell (not a plain string) so the arrow's
-// color escape codes don't get counted by writeTable's column-width
-// calculation.
-func withTrendArrow(text, trend string) cell {
-	visibleArrow, renderedArrow := trendArrowParts(trend)
-	if visibleArrow == "" {
-		return plainCell(text)
+// shapeCell renders a bare arrow sparkline (see MetricSegments.Sparkline)
+// as its own cell, e.g. for printMetricDetail's SHAPE column.
+func shapeCell(shape, trend string) cell {
+	if shape == "" {
+		return plainCell("")
 	}
-	return coloredCell(text+" "+visibleArrow, text+" "+renderedArrow)
+	return joinShapeCell("", shape, trend)
+}
+
+// joinShapeCell joins text and shape with a space (or returns shape alone if
+// text is empty), colorizing the shape only when trend (MetricSegments.Trend)
+// is notable -- a flat/steady run's shape doesn't need to stand out. Built as
+// a cell (not a plain string) so the color escape codes don't get counted by
+// writeTable's column-width calculation.
+func joinShapeCell(text, shape, trend string) cell {
+	visible := shape
+	rendered := shape
+	if trendIsNotable(trend) {
+		rendered = yellow(shape)
+	}
+	if text != "" {
+		visible = text + " " + visible
+		rendered = text + " " + rendered
+	}
+	if !trendIsNotable(trend) {
+		return plainCell(visible)
+	}
+	return coloredCell(visible, rendered)
 }
 
 func printCompare(items []aibom.AIBOM) {

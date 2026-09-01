@@ -224,6 +224,33 @@ func (s MetricSegments) Trend() string {
 	}
 }
 
+// slopeSymbol renders a first->second transition as "↗" (rising), "↘"
+// (falling), or "→" (roughly flat), using the same 10% threshold Trend()
+// uses for up/down.
+func slopeSymbol(from, to float64) string {
+	switch pct := segmentPctChange(from, to); {
+	case pct > 10:
+		return "↗"
+	case pct < -10:
+		return "↘"
+	default:
+		return "→"
+	}
+}
+
+// Sparkline renders the run's first/middle/last-third shape as a compact
+// two-arrow string -- e.g. "↘↗" for a dip-then-recover, "↗↗" for a steady
+// climb, "→→" for flat. More visual than Trend()'s single up/down/flat/
+// volatile verdict, and it needs no separate "volatile" case: a mixed shape
+// just draws as a mixed arrow sequence. Returns "" unless all three thirds
+// are present.
+func (s MetricSegments) Sparkline() string {
+	if s.FirstThird == nil || s.MiddleThird == nil || s.LastThird == nil {
+		return ""
+	}
+	return slopeSymbol(*s.FirstThird, *s.MiddleThird) + slopeSymbol(*s.MiddleThird, *s.LastThird)
+}
+
 // MetricStats is the full min/max/avg/p95/segments breakdown of one
 // telemetry metric across a run, as compiled by postprocess.py's
 // compute_metric_stats(). Keyed in ResourceUtilization.Metrics by the same

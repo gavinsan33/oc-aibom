@@ -140,6 +140,36 @@ func TestDiffPerformanceCarriesPerRunTrend(t *testing.T) {
 	if m.TrendB != "up" {
 		t.Fatalf("expected TrendB=up, got %q", m.TrendB)
 	}
+	// No MiddleThird set above, so Sparkline() (which needs all three
+	// segments) has nothing to render -- Trend() alone can fall back to
+	// just first-vs-last, but Sparkline() can't draw two slopes from two
+	// points.
+	if m.ShapeA != "" || m.ShapeB != "" {
+		t.Fatalf("expected empty shapes with no MiddleThird, got %q / %q", m.ShapeA, m.ShapeB)
+	}
+}
+
+func TestDiffPerformanceCarriesPerRunShape(t *testing.T) {
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
+		Metrics: map[string]MetricStats{
+			"gpu_utilization": {Segments: MetricSegments{FirstThird: f(100), MiddleThird: f(50), LastThird: f(100)}},
+		},
+	}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
+		Metrics: map[string]MetricStats{
+			"gpu_utilization": {Segments: MetricSegments{FirstThird: f(10), MiddleThird: f(50), LastThird: f(90)}},
+		},
+	}}}
+	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
+	if !ok {
+		t.Fatalf("expected avg_gpu_utilization_pct metric")
+	}
+	if m.ShapeA != "↘↗" {
+		t.Fatalf("expected ShapeA=↘↗, got %q", m.ShapeA)
+	}
+	if m.ShapeB != "↗↗" {
+		t.Fatalf("expected ShapeB=↗↗, got %q", m.ShapeB)
+	}
 }
 
 func TestDiffPerformanceTrendEmptyWhenMetricMissing(t *testing.T) {

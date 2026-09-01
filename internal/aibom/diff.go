@@ -15,9 +15,10 @@ type FieldDiff struct {
 // MetricDiff is a quantified comparison of one resource_utilization metric
 // between two AIBOMs. PctChange is relative to A; it is NaN when A is zero
 // (division by zero), which callers should render as "N/A". TrendA/TrendB
-// are each run's own within-run trend ("up"/"down"/"flat"/"") -- an axis
-// distinct from Delta/PctChange, which only compares the two runs' averages
-// and says nothing about whether either run was steady or drifting.
+// and ShapeA/ShapeB are each run's own within-run shape (Trend()'s verdict
+// and Sparkline()'s ASCII rendering, respectively) -- an axis distinct from
+// Delta/PctChange, which only compares the two runs' averages and says
+// nothing about whether either run was steady or drifting.
 type MetricDiff struct {
 	Metric    string
 	A         float64
@@ -26,6 +27,8 @@ type MetricDiff struct {
 	PctChange float64 // (B - A) / A * 100
 	TrendA    string
 	TrendB    string
+	ShapeA    string
+	ShapeB    string
 }
 
 // metricSpec names a resource_utilization field and how to extract it, so
@@ -56,6 +59,14 @@ func trendFor(r ResourceUtilization, rawKey string) string {
 	return stats.Segments.Trend()
 }
 
+func shapeFor(r ResourceUtilization, rawKey string) string {
+	stats, ok := r.Metrics[rawKey]
+	if !ok {
+		return ""
+	}
+	return stats.Segments.Sparkline()
+}
+
 // DiffPerformance quantifies the change in each resource_utilization metric
 // from a to b. Unlike Diff, it always returns one entry per metric (even
 // when unchanged), since "no change" is itself a useful performance-compare
@@ -77,6 +88,8 @@ func DiffPerformance(a, b AIBOM) []MetricDiff {
 			PctChange: pct,
 			TrendA:    trendFor(a.Data.ResourceUtilization, m.RawKey),
 			TrendB:    trendFor(b.Data.ResourceUtilization, m.RawKey),
+			ShapeA:    shapeFor(a.Data.ResourceUtilization, m.RawKey),
+			ShapeB:    shapeFor(b.Data.ResourceUtilization, m.RawKey),
 		})
 	}
 	return diffs
