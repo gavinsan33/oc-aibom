@@ -5,9 +5,18 @@ import "strings"
 // Filter narrows a list of AIBOMs by exact-match (case-insensitive) on the
 // given criteria. Empty fields are not filtered on.
 type Filter struct {
-	Model        string
-	Intent       string
-	Quantization string
+	Model            string
+	Intent           string
+	Quantization     string
+	Architecture     string
+	Framework        string
+	GPUType          string
+	JobName          string
+	GitBranch        string
+	GitRepository    string
+	ServingEngine    string
+	AdaptationMethod string
+	Optimizer        string
 }
 
 func (f Filter) Match(a AIBOM) bool {
@@ -18,6 +27,33 @@ func (f Filter) Match(a AIBOM) bool {
 		return false
 	}
 	if f.Quantization != "" && !strings.EqualFold(a.Data.Model.Quantization, f.Quantization) {
+		return false
+	}
+	if f.Architecture != "" && !strings.EqualFold(a.Data.Model.Architecture, f.Architecture) {
+		return false
+	}
+	if f.Framework != "" && !strings.EqualFold(a.Data.Model.Framework, f.Framework) {
+		return false
+	}
+	if f.GPUType != "" && !strings.EqualFold(a.Data.Environment.GPUType, f.GPUType) {
+		return false
+	}
+	if f.JobName != "" && !strings.EqualFold(a.JobName, f.JobName) {
+		return false
+	}
+	if f.GitBranch != "" && !strings.EqualFold(a.Data.SourceCode.GitBranch, f.GitBranch) {
+		return false
+	}
+	if f.GitRepository != "" && !strings.EqualFold(a.Data.SourceCode.GitRepository, f.GitRepository) {
+		return false
+	}
+	if f.ServingEngine != "" && (a.Data.Inference == nil || !strings.EqualFold(a.Data.Inference.ServingEngine, f.ServingEngine)) {
+		return false
+	}
+	if f.AdaptationMethod != "" && (a.Data.FineTuning == nil || !strings.EqualFold(a.Data.FineTuning.AdaptationMethod, f.AdaptationMethod)) {
+		return false
+	}
+	if f.Optimizer != "" && (a.Data.Training == nil || !strings.EqualFold(a.Data.Training.Optimizer, f.Optimizer)) {
 		return false
 	}
 	return true
