@@ -16,8 +16,18 @@ const (
 	ansiRed       = "\x1b[31m"
 	ansiGreen     = "\x1b[32m"
 	ansiYellow    = "\x1b[33m"
+	ansiBlue      = "\x1b[34m"
+	ansiMagenta   = "\x1b[35m"
+	ansiCyan      = "\x1b[36m"
 	ansiDefaultFG = "\x1b[39m"
 )
+
+// runColors cycles through distinct colors for each AIBOM being compared in
+// diff/compare, so a value in the table can be traced back to its source
+// run at a glance without re-reading the header every time.
+var runColors = []string{ansiBlue, ansiMagenta, ansiYellow, ansiGreen, ansiRed, ansiCyan}
+
+func runColor(i int) string { return runColors[i%len(runColors)] }
 
 var colorEnabled bool
 
@@ -45,7 +55,16 @@ func colorize(code, s string) string {
 	return code + s + ansiReset
 }
 
+// boldColorize applies both bold and code in a single escape/reset pair.
+func boldColorize(code, s string) string {
+	if !colorEnabled {
+		return s
+	}
+	return ansiBold + code + s + ansiReset
+}
+
 func bold(s string) string { return colorize(ansiBold, s) }
+func cyan(s string) string { return colorize(ansiCyan, s) }
 
 // colorBySign colorizes s green/red/default-fg depending on the sign of v.
 func colorBySign(v float64, s string) string {
@@ -92,6 +111,23 @@ func headerRow(values ...string) []cell {
 		row[i] = coloredCell(v, bold(v))
 	}
 	return row
+}
+
+// labelHeaderCell renders a diff/compare table's leading column header
+// (FIELD, METRIC) bold and cyan, distinguishing it from the AIBOM-name
+// columns that follow.
+func labelHeaderCell(s string) cell { return coloredCell(s, boldColorize(ansiCyan, s)) }
+
+// labelCell renders a diff/compare data row's leading cell (a field or
+// metric name) cyan, matching labelHeaderCell so the whole column reads as
+// one unit.
+func labelCell(s string) cell { return coloredCell(s, cyan(s)) }
+
+// runHeaderCell renders the i-th AIBOM name in a diff/compare header bold
+// and in that run's color (see runColor), so its data cells below can be
+// traced back to it at a glance.
+func runHeaderCell(i int, name string) cell {
+	return coloredCell(name, boldColorize(runColor(i), name))
 }
 
 // writeTable prints rows padded to align columns, using each cell's visible
