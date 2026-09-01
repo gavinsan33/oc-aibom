@@ -28,3 +28,27 @@ jobs:
         with:
           files: dist/*.tar.gz,dist/checksums.txt
           generate_release_notes: true
+
+      - name: Update krew manifest
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin master
+          git checkout master
+
+          OLD_VERSION=$(grep -m1 '^  version:' plugins/aibom.yaml | awk '{print $2}')
+          NEW_VERSION="${{ github.ref_name }}"
+          sed -i "s/${OLD_VERSION}/${NEW_VERSION}/g" plugins/aibom.yaml
+
+          while read -r hash file; do
+            awk -v file="$file" -v hash="$hash" '
+              $0 ~ file { print; getline; sub(/sha256: .*/, "sha256: " hash); print; next }
+              { print }
+            ' plugins/aibom.yaml > plugins/aibom.yaml.tmp
+            mv plugins/aibom.yaml.tmp plugins/aibom.yaml
+          done < dist/checksums.txt
+
+          git add plugins/aibom.yaml
+          git diff --cached --quiet || git commit -m "Point krew manifest at ${NEW_VERSION}"
+          git push origin master
