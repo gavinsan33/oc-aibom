@@ -303,21 +303,24 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 	if len(diffs) == 0 {
 		fmt.Printf("No differences found between %s and %s (across compared config/metadata fields).\n", nameA, nameB)
 	} else {
-		rows := [][]cell{headerRow("FIELD", nameA, nameB)}
+		rows := [][]cell{{labelHeaderCell("FIELD"), runHeaderCell(0, nameA), runHeaderCell(1, nameB)}}
 		for _, d := range diffs {
-			rows = append(rows, plainRow(d.Field, d.A, d.B))
+			rows = append(rows, []cell{labelCell(d.Field), plainCell(d.A), plainCell(d.B)})
 		}
 		writeTable(os.Stdout, rows)
 	}
 
 	fmt.Println()
 	fmt.Println(bold("Performance:"))
-	rows := [][]cell{headerRow("METRIC", nameA, nameB, "DELTA", "CHANGE")}
+	rows := [][]cell{{
+		labelHeaderCell("METRIC"), runHeaderCell(0, nameA), runHeaderCell(1, nameB),
+		coloredCell("DELTA", bold("DELTA")), coloredCell("CHANGE", bold("CHANGE")),
+	}}
 	for _, m := range metrics {
 		deltaText := fmt.Sprintf("%+.2f", m.Delta)
 		changeText := formatPctChange(m.PctChange)
 		rows = append(rows, []cell{
-			plainCell(m.Metric),
+			labelCell(m.Metric),
 			plainCell(formatMetric(m.A)),
 			plainCell(formatMetric(m.B)),
 			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
@@ -328,20 +331,20 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 }
 
 func printCompare(items []aibom.AIBOM) {
-	headerCells := make([]string, len(items)+1)
-	headerCells[0] = "FIELD"
+	header := make([]cell, len(items)+1)
+	header[0] = labelHeaderCell("FIELD")
 	for i, a := range items {
-		headerCells[i+1] = a.Name
+		header[i+1] = runHeaderCell(i, a.Name)
 	}
-	rows := [][]cell{headerRow(headerCells...)}
+	rows := [][]cell{header}
 
 	row := func(label string, values func(aibom.AIBOM) string) {
-		cells := make([]string, len(items)+1)
-		cells[0] = label
+		cells := make([]cell, len(items)+1)
+		cells[0] = labelCell(label)
 		for i, a := range items {
-			cells[i+1] = values(a)
+			cells[i+1] = plainCell(values(a))
 		}
-		rows = append(rows, plainRow(cells...))
+		rows = append(rows, cells)
 	}
 
 	row("Model", func(a aibom.AIBOM) string { return a.Data.Model.Name })
