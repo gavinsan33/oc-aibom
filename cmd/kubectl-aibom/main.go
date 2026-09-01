@@ -99,9 +99,10 @@ func main() {
 	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first)")
 
 	getCmd := &cobra.Command{
-		Use:   "describe <name>",
-		Short: "Print a human-readable summary of a single AIBOM",
-		Args:  cobra.ExactArgs(1),
+		Use:               "describe <name>",
+		Short:             "Print a human-readable summary of a single AIBOM",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeAIBOMNames(configFlags, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, namespace, err := buildClient(configFlags)
 			if err != nil {
@@ -117,9 +118,10 @@ func main() {
 	}
 
 	diffCmd := &cobra.Command{
-		Use:   "diff <name-a> <name-b>",
-		Short: "Show field-level differences between two AIBOMs",
-		Args:  cobra.ExactArgs(2),
+		Use:               "diff <name-a> <name-b>",
+		Short:             "Show field-level differences between two AIBOMs",
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: completeAIBOMNames(configFlags, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, namespace, err := buildClient(configFlags)
 			if err != nil {
@@ -140,9 +142,10 @@ func main() {
 	}
 
 	compareCmd := &cobra.Command{
-		Use:   "compare <name> <name> [<name>...]",
-		Short: "Show performance metrics for two or more AIBOMs side by side",
-		Args:  cobra.MinimumNArgs(2),
+		Use:               "compare <name> <name> [<name>...]",
+		Short:             "Show performance metrics for two or more AIBOMs side by side",
+		Args:              cobra.MinimumNArgs(2),
+		ValidArgsFunction: completeAIBOMNames(configFlags, 0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, namespace, err := buildClient(configFlags)
 			if err != nil {
@@ -167,6 +170,38 @@ func main() {
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+// completeAIBOMNames returns a cobra ValidArgsFunction that suggests AIBOM
+// names from the target namespace (respecting -n/--namespace), excluding
+// names already given as positional args. maxArgs caps how many positional
+// args this command accepts (0 means unlimited, e.g. `compare`); once
+// reached, no further names are suggested.
+func completeAIBOMNames(configFlags *genericclioptions.ConfigFlags, maxArgs int) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if maxArgs > 0 && len(args) >= maxArgs {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		client, namespace, err := buildClient(configFlags)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		items, err := aibom.List(context.Background(), client, namespace)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		given := make(map[string]bool, len(args))
+		for _, a := range args {
+			given[a] = true
+		}
+		var names []string
+		for _, item := range items {
+			if !given[item.Name] {
+				names = append(names, item.Name)
+			}
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
 	}
 }
 
