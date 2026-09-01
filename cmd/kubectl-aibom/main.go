@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -205,7 +203,6 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 		metricHeader = metricLabels[sortBy]
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
 	cols := []string{"NAME", "JOB", "MODEL", "INTENT", "QUANTIZATION", "GPU TYPE", "COLLECTED AT"}
 	if allNamespaces {
 		cols = append([]string{"NAMESPACE"}, cols...)
@@ -213,21 +210,22 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 	if metricHeader != "" {
 		cols = append(cols, metricHeader)
 	}
-	fmt.Fprintln(w, boldRow(cols...))
+	rows := [][]cell{headerRow(cols...)}
 
 	for _, a := range items {
-		row := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s",
+		values := []string{
 			a.Name, a.JobName, a.Data.Model.Name, a.ExperimentIntent,
-			a.Data.Model.Quantization, a.Data.Environment.GPUType, a.CollectedAt)
+			a.Data.Model.Quantization, a.Data.Environment.GPUType, a.CollectedAt,
+		}
 		if allNamespaces {
-			row = a.Namespace + "\t" + row
+			values = append([]string{a.Namespace}, values...)
 		}
 		if metricGet != nil {
-			row += "\t" + formatMetric(metricGet(a.Data.ResourceUtilization))
+			values = append(values, formatMetric(metricGet(a.Data.ResourceUtilization)))
 		}
-		fmt.Fprintln(w, row)
+		rows = append(rows, plainRow(values...))
 	}
-	w.Flush()
+	writeTable(os.Stdout, rows)
 	if len(items) == 0 {
 		fmt.Println("No AIBOMs found.")
 	}
@@ -305,51 +303,55 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 	if len(diffs) == 0 {
 		fmt.Printf("No differences found between %s and %s (across compared config/metadata fields).\n", nameA, nameB)
 	} else {
-		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-		fmt.Fprintln(w, boldRow("FIELD", nameA, nameB))
+		rows := [][]cell{headerRow("FIELD", nameA, nameB)}
 		for _, d := range diffs {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", d.Field, d.A, d.B)
+			rows = append(rows, plainRow(d.Field, d.A, d.B))
 		}
-		w.Flush()
+		writeTable(os.Stdout, rows)
 	}
 
 	fmt.Println()
 	fmt.Println(bold("Performance:"))
-	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(w, boldRow("METRIC", nameA, nameB, "DELTA", "CHANGE"))
+	rows := [][]cell{headerRow("METRIC", nameA, nameB, "DELTA", "CHANGE")}
 	for _, m := range metrics {
-		delta := colorBySign(m.Delta, fmt.Sprintf("%+.2f", m.Delta))
-		change := colorBySign(m.PctChange, formatPctChange(m.PctChange))
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			m.Metric, formatMetric(m.A), formatMetric(m.B), delta, change)
+		deltaText := fmt.Sprintf("%+.2f", m.Delta)
+		changeText := formatPctChange(m.PctChange)
+		rows = append(rows, []cell{
+			plainCell(m.Metric),
+			plainCell(formatMetric(m.A)),
+			plainCell(formatMetric(m.B)),
+			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
+			coloredCell(changeText, colorBySign(m.PctChange, changeText)),
+		})
 	}
-	w.Flush()
+	writeTable(os.Stdout, rows)
 }
 
 func printCompare(items []aibom.AIBOM) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-
 	headerCells := make([]string, len(items)+1)
 	headerCells[0] = "FIELD"
 	for i, a := range items {
 		headerCells[i+1] = a.Name
 	}
-	fmt.Fprintln(w, boldRow(headerCells...))
+	rows := [][]cell{headerRow(headerCells...)}
 
 	row := func(label string, values func(aibom.AIBOM) string) {
-		cells := make([]string, len(items))
+		cells := make([]string, len(items)+1)
+		cells[0] = label
 		for i, a := range items {
-			cells[i] = values(a)
+			cells[i+1] = values(a)
 		}
-		fmt.Fprintln(w, label+"\t"+strings.Join(cells, "\t"))
+		rows = append(rows, plainRow(cells...))
 	}
 
 	row("Model", func(a aibom.AIBOM) string { return a.Data.Model.Name })
 	row("Quantization", func(a aibom.AIBOM) string { return a.Data.Model.Quantization })
 	row("Intent", func(a aibom.AIBOM) string { return a.ExperimentIntent })
 	row("GPU Type", func(a aibom.AIBOM) string { return a.Data.Environment.GPUType })
-	fmt.Fprintln(w)
+	writeTable(os.Stdout, rows)
+	fmt.Println()
 
+	rows = nil
 	for _, m := range []struct {
 		label string
 		get   func(aibom.ResourceUtilization) float64
@@ -369,5 +371,5 @@ func printCompare(items []aibom.AIBOM) {
 			return formatMetric(m.get(a.Data.ResourceUtilization))
 		})
 	}
-	w.Flush()
+	writeTable(os.Stdout, rows)
 }
