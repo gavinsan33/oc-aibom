@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -251,15 +252,29 @@ var telemetryMetricLabels = map[string]string{
 	"network_transmit": "Network TX",
 }
 
-// trendIsNotable reports whether a Trend() verdict is worth visually
-// flagging -- anything but a steady run or missing data.
-func trendIsNotable(trend string) bool {
-	switch trend {
-	case "up", "down", "volatile":
-		return true
-	default:
-		return false
+// colorizeShape wraps each arrow rune in a Sparkline() shape with its own
+// direction's color (green for ↗, red for ↘, yellow for →), rather than one
+// color for the whole string based on the metric's overall Trend(). A mixed
+// shape like "↘↗" (dip then recover) needs both colors -- painting the whole
+// thing one color (e.g. yellow for Trend()'s "volatile" verdict) would make
+// the same ↘ glyph appear red in one row (a metric classified "down") and
+// yellow in another (a metric classified "volatile"), which reads as
+// inconsistent even though both rows show a real decline at that point.
+func colorizeShape(shape string) string {
+	var b strings.Builder
+	for _, r := range shape {
+		switch r {
+		case '↗':
+			b.WriteString(green(string(r)))
+		case '↘':
+			b.WriteString(red(string(r)))
+		case '→':
+			b.WriteString(yellow(string(r)))
+		default:
+			b.WriteRune(r)
+		}
 	}
+	return b.String()
 }
 
 func formatSegment(v *float64) string {
@@ -403,7 +418,7 @@ func printMetricDetail(ru aibom.ResourceUtilization) {
 			plainCell(formatMetric(m.P95)),
 			plainCell(m.Unit),
 			plainCell(segmentsText),
-			shapeCell(m.Segments.Sparkline(), m.Segments.Trend()),
+			shapeCell(m.Segments.Sparkline()),
 		})
 	}
 	writeTable(os.Stdout, rows)
@@ -431,8 +446,8 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 		changeText := formatPctChange(m.PctChange)
 		rows = append(rows, []cell{
 			labelCell(m.Metric),
-			metricCellWithShape(m.A, m.ShapeA, m.TrendA),
-			metricCellWithShape(m.B, m.ShapeB, m.TrendB),
+			metricCellWithShape(m.A, m.ShapeA),
+			metricCellWithShape(m.B, m.ShapeB),
 			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
 			coloredCell(changeText, colorBySign(m.PctChange, changeText)),
 		})
@@ -444,39 +459,31 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 // MetricSegments.Sparkline) to a metric value, when known -- e.g. "75.00 ↘↗"
 // flags that a run's own average dipped then recovered, a distinction the
 // cross-run delta/change columns can't make on their own.
-func metricCellWithShape(v float64, shape, trend string) cell {
+func metricCellWithShape(v float64, shape string) cell {
 	if shape == "" {
 		return plainCell(formatMetric(v))
 	}
-	return joinShapeCell(formatMetric(v), shape, trend)
+	return joinShapeCell(formatMetric(v), shape)
 }
 
 // shapeCell renders a bare arrow sparkline (see MetricSegments.Sparkline)
 // as its own cell, e.g. for printMetricDetail's SHAPE column.
-func shapeCell(shape, trend string) cell {
+func shapeCell(shape string) cell {
 	if shape == "" {
 		return plainCell("")
 	}
-	return joinShapeCell("", shape, trend)
+	return joinShapeCell("", shape)
 }
 
 // joinShapeCell joins text and shape with a space (or returns shape alone if
-// text is empty), colorizing the shape only when trend (MetricSegments.Trend)
-// is notable -- a flat/steady run's shape doesn't need to stand out. Built as
-// a cell (not a plain string) so the color escape codes don't get counted by
-// writeTable's column-width calculation.
-func joinShapeCell(text, shape, trend string) cell {
-	visible := shape
-	rendered := shape
-	if trendIsNotable(trend) {
-		rendered = yellow(shape)
-	}
+// text is empty), colorizing each arrow in shape individually (see
+// colorizeShape). Built as a cell (not a plain string) so the color escape
+// codes don't get counted by writeTable's column-width calculation.
+func joinShapeCell(text, shape string) cell {
+	visible, rendered := shape, colorizeShape(shape)
 	if text != "" {
 		visible = text + " " + visible
 		rendered = text + " " + rendered
-	}
-	if !trendIsNotable(trend) {
-		return plainCell(visible)
 	}
 	return coloredCell(visible, rendered)
 }
