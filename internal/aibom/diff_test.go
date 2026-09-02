@@ -77,8 +77,8 @@ func findMetric(diffs []MetricDiff, metric string) (MetricDiff, bool) {
 }
 
 func TestDiffPerformanceComputesDeltaAndPctChange(t *testing.T) {
-	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 50}}}
-	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 75}}}
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_utilization": {Avg: 50}}}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_utilization": {Avg: 75}}}}}
 	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
 	if !ok {
 		t.Fatalf("expected avg_gpu_utilization_pct metric")
@@ -92,8 +92,8 @@ func TestDiffPerformanceComputesDeltaAndPctChange(t *testing.T) {
 }
 
 func TestDiffPerformanceZeroBaselineIsNaN(t *testing.T) {
-	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUPowerWatts: 0}}}
-	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUPowerWatts: 100}}}
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_power": {Avg: 0}}}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_power": {Avg: 100}}}}}
 	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_power_watts")
 	if !ok {
 		t.Fatalf("expected avg_gpu_power_watts metric")
@@ -119,15 +119,13 @@ func f(v float64) *float64 { return &v }
 
 func TestDiffPerformanceCarriesPerRunTrend(t *testing.T) {
 	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
-		AvgGPUUtilizationPct: 50,
 		Metrics: map[string]MetricStats{
-			"gpu_utilization": {Segments: MetricSegments{FirstThird: f(90), LastThird: f(10)}},
+			"gpu_utilization": {Avg: 50, Segments: MetricSegments{FirstThird: f(90), LastThird: f(10)}},
 		},
 	}}}
 	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
-		AvgGPUUtilizationPct: 50,
 		Metrics: map[string]MetricStats{
-			"gpu_utilization": {Segments: MetricSegments{FirstThird: f(10), LastThird: f(90)}},
+			"gpu_utilization": {Avg: 50, Segments: MetricSegments{FirstThird: f(10), LastThird: f(90)}},
 		},
 	}}}
 	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")

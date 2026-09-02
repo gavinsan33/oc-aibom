@@ -151,17 +151,17 @@ type Environment struct {
 
 type ResourceUtilization struct {
 	CollectedAt              string                 `json:"collected_at"`
-	AvgGPUUtilizationPct     float64                `json:"avg_gpu_utilization_pct"`
-	AvgGPUMemoryUsedMiB      float64                `json:"avg_gpu_memory_used_mib"`
-	AvgGPUPowerWatts         float64                `json:"avg_gpu_power_watts"`
-	AvgCPUUsageCores         float64                `json:"avg_cpu_usage_cores"`
-	AvgMemoryUsageGB         float64                `json:"avg_memory_usage_gb"`
-	AvgNetworkReceiveMbps    float64                `json:"avg_network_receive_mbps"`
-	AvgNetworkTransmitMbps   float64                `json:"avg_network_transmit_mbps"`
 	GrafanaLinks             []string               `json:"grafana_links"`
 	SummaryIncludesColdStart bool                   `json:"summary_includes_cold_start"`
 	Note                     string                 `json:"note"`
 	Metrics                  map[string]MetricStats `json:"metrics"`
+}
+
+// MetricAvg returns the run-wide average for the named Metrics entry (e.g.
+// "gpu_utilization"), or 0 if that metric wasn't collected. Replaces the
+// flat avg_* fields the AIBOM used to carry directly on ResourceUtilization.
+func (r ResourceUtilization) MetricAvg(key string) float64 {
+	return r.Metrics[key].Avg
 }
 
 // MetricSegments is a first/middle/last-third breakdown of one telemetry

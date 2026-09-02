@@ -4,9 +4,9 @@ import "testing"
 
 func newUtilizationAIBOMs() []AIBOM {
 	return []AIBOM{
-		{Name: "low", Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 20}}},
-		{Name: "high", Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 90}}},
-		{Name: "mid", Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 55}}},
+		{Name: "low", Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_utilization": {Avg: 20}}}}},
+		{Name: "high", Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_utilization": {Avg: 90}}}}},
+		{Name: "mid", Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_utilization": {Avg: 55}}}}},
 	}
 }
 

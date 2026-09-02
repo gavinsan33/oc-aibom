@@ -42,13 +42,13 @@ type metricSpec struct {
 }
 
 var performanceMetrics = []metricSpec{
-	{"avg_gpu_utilization_pct", "gpu_utilization", func(r ResourceUtilization) float64 { return r.AvgGPUUtilizationPct }},
-	{"avg_gpu_memory_used_mib", "gpu_memory_used", func(r ResourceUtilization) float64 { return r.AvgGPUMemoryUsedMiB }},
-	{"avg_gpu_power_watts", "gpu_power", func(r ResourceUtilization) float64 { return r.AvgGPUPowerWatts }},
-	{"avg_cpu_usage_cores", "cpu_usage", func(r ResourceUtilization) float64 { return r.AvgCPUUsageCores }},
-	{"avg_memory_usage_gb", "memory_usage", func(r ResourceUtilization) float64 { return r.AvgMemoryUsageGB }},
-	{"avg_network_receive_mbps", "network_receive", func(r ResourceUtilization) float64 { return r.AvgNetworkReceiveMbps }},
-	{"avg_network_transmit_mbps", "network_transmit", func(r ResourceUtilization) float64 { return r.AvgNetworkTransmitMbps }},
+	{"avg_gpu_utilization_pct", "gpu_utilization", func(r ResourceUtilization) float64 { return r.MetricAvg("gpu_utilization") }},
+	{"avg_gpu_memory_used_mib", "gpu_memory_used", func(r ResourceUtilization) float64 { return r.MetricAvg("gpu_memory_used") }},
+	{"avg_gpu_power_watts", "gpu_power", func(r ResourceUtilization) float64 { return r.MetricAvg("gpu_power") }},
+	{"avg_cpu_usage_cores", "cpu_usage", func(r ResourceUtilization) float64 { return r.MetricAvg("cpu_usage") }},
+	{"avg_memory_usage_gb", "memory_usage", func(r ResourceUtilization) float64 { return r.MetricAvg("memory_usage") }},
+	{"avg_network_receive_mbps", "network_receive", func(r ResourceUtilization) float64 { return r.MetricAvg("network_receive") }},
+	{"avg_network_transmit_mbps", "network_transmit", func(r ResourceUtilization) float64 { return r.MetricAvg("network_transmit") }},
 }
 
 func trendFor(r ResourceUtilization, rawKey string) string {

@@ -371,12 +371,12 @@ func printDescribe(a aibom.AIBOM) {
 	if ru.Note != "" {
 		fmt.Printf("  %s\n", ru.Note)
 	} else {
-		fmt.Printf("  GPU Utilization: %.2f%%\n", ru.AvgGPUUtilizationPct)
-		fmt.Printf("  GPU Memory Used: %.2f MiB\n", ru.AvgGPUMemoryUsedMiB)
-		fmt.Printf("  GPU Power:       %.2f W\n", ru.AvgGPUPowerWatts)
-		fmt.Printf("  CPU Usage:       %.2f cores\n", ru.AvgCPUUsageCores)
-		fmt.Printf("  Memory Usage:    %.2f GB\n", ru.AvgMemoryUsageGB)
-		fmt.Printf("  Network RX/TX:   %.2f / %.2f Mbps\n", ru.AvgNetworkReceiveMbps, ru.AvgNetworkTransmitMbps)
+		fmt.Printf("  GPU Utilization: %.2f%%\n", ru.MetricAvg("gpu_utilization"))
+		fmt.Printf("  GPU Memory Used: %.2f MiB\n", ru.MetricAvg("gpu_memory_used"))
+		fmt.Printf("  GPU Power:       %.2f W\n", ru.MetricAvg("gpu_power"))
+		fmt.Printf("  CPU Usage:       %.2f cores\n", ru.MetricAvg("cpu_usage"))
+		fmt.Printf("  Memory Usage:    %.2f GB\n", ru.MetricAvg("memory_usage"))
+		fmt.Printf("  Network RX/TX:   %.2f / %.2f Mbps\n", ru.MetricAvg("network_receive"), ru.MetricAvg("network_transmit"))
 		if ru.SummaryIncludesColdStart {
 			fmt.Println("  (includes cold start)")
 		}
@@ -517,13 +517,13 @@ func printCompare(items []aibom.AIBOM) {
 		label string
 		get   func(aibom.ResourceUtilization) float64
 	}{
-		{"GPU Utilization %", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUUtilizationPct }},
-		{"GPU Memory (MiB)", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUMemoryUsedMiB }},
-		{"GPU Power (W)", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUPowerWatts }},
-		{"CPU Usage (cores)", func(r aibom.ResourceUtilization) float64 { return r.AvgCPUUsageCores }},
-		{"Memory Usage (GB)", func(r aibom.ResourceUtilization) float64 { return r.AvgMemoryUsageGB }},
-		{"Network RX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.AvgNetworkReceiveMbps }},
-		{"Network TX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.AvgNetworkTransmitMbps }},
+		{"GPU Utilization %", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_utilization") }},
+		{"GPU Memory (MiB)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_memory_used") }},
+		{"GPU Power (W)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_power") }},
+		{"CPU Usage (cores)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("cpu_usage") }},
+		{"Memory Usage (GB)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("memory_usage") }},
+		{"Network RX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("network_receive") }},
+		{"Network TX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("network_transmit") }},
 	} {
 		row(m.label, func(a aibom.AIBOM) string {
 			if a.Data.ResourceUtilization.Note != "" {
