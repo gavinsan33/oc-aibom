@@ -77,8 +77,8 @@ func findMetric(diffs []MetricDiff, metric string) (MetricDiff, bool) {
 }
 
 func TestDiffPerformanceComputesDeltaAndPctChange(t *testing.T) {
-	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 50}}}
-	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUUtilizationPct: 75}}}
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_utilization": {Avg: 50}}}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_utilization": {Avg: 75}}}}}
 	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
 	if !ok {
 		t.Fatalf("expected avg_gpu_utilization_pct metric")
@@ -92,8 +92,8 @@ func TestDiffPerformanceComputesDeltaAndPctChange(t *testing.T) {
 }
 
 func TestDiffPerformanceZeroBaselineIsNaN(t *testing.T) {
-	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUPowerWatts: 0}}}
-	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{AvgGPUPowerWatts: 100}}}
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_power": {Avg: 0}}}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"gpu_power": {Avg: 100}}}}}
 	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_power_watts")
 	if !ok {
 		t.Fatalf("expected avg_gpu_power_watts metric")
@@ -112,5 +112,72 @@ func TestDiffPerformanceReturnsAllMetricsEvenIfUnchanged(t *testing.T) {
 	metrics := DiffPerformance(a, b)
 	if len(metrics) != len(performanceMetrics) {
 		t.Fatalf("expected %d metrics, got %d", len(performanceMetrics), len(metrics))
+	}
+}
+
+func f(v float64) *float64 { return &v }
+
+func TestDiffPerformanceCarriesPerRunTrend(t *testing.T) {
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
+		Metrics: map[string]MetricStats{
+			"gpu_utilization": {Avg: 50, Segments: MetricSegments{FirstThird: f(90), LastThird: f(10)}},
+		},
+	}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
+		Metrics: map[string]MetricStats{
+			"gpu_utilization": {Avg: 50, Segments: MetricSegments{FirstThird: f(10), LastThird: f(90)}},
+		},
+	}}}
+	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
+	if !ok {
+		t.Fatalf("expected avg_gpu_utilization_pct metric")
+	}
+	if m.TrendA != "down" {
+		t.Fatalf("expected TrendA=down, got %q", m.TrendA)
+	}
+	if m.TrendB != "up" {
+		t.Fatalf("expected TrendB=up, got %q", m.TrendB)
+	}
+	// No MiddleThird set above, so Sparkline() (which needs all three
+	// segments) has nothing to render -- Trend() alone can fall back to
+	// just first-vs-last, but Sparkline() can't draw two slopes from two
+	// points.
+	if m.ShapeA != "" || m.ShapeB != "" {
+		t.Fatalf("expected empty shapes with no MiddleThird, got %q / %q", m.ShapeA, m.ShapeB)
+	}
+}
+
+func TestDiffPerformanceCarriesPerRunShape(t *testing.T) {
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
+		Metrics: map[string]MetricStats{
+			"gpu_utilization": {Segments: MetricSegments{FirstThird: f(100), MiddleThird: f(50), LastThird: f(100)}},
+		},
+	}}}
+	b := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{
+		Metrics: map[string]MetricStats{
+			"gpu_utilization": {Segments: MetricSegments{FirstThird: f(10), MiddleThird: f(50), LastThird: f(90)}},
+		},
+	}}}
+	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
+	if !ok {
+		t.Fatalf("expected avg_gpu_utilization_pct metric")
+	}
+	if m.ShapeA != "↘↗" {
+		t.Fatalf("expected ShapeA=↘↗, got %q", m.ShapeA)
+	}
+	if m.ShapeB != "↗↗" {
+		t.Fatalf("expected ShapeB=↗↗, got %q", m.ShapeB)
+	}
+}
+
+func TestDiffPerformanceTrendEmptyWhenMetricMissing(t *testing.T) {
+	a := AIBOM{}
+	b := AIBOM{}
+	m, ok := findMetric(DiffPerformance(a, b), "avg_gpu_utilization_pct")
+	if !ok {
+		t.Fatalf("expected avg_gpu_utilization_pct metric")
+	}
+	if m.TrendA != "" || m.TrendB != "" {
+		t.Fatalf("expected empty trends with no Metrics data, got %q / %q", m.TrendA, m.TrendB)
 	}
 }

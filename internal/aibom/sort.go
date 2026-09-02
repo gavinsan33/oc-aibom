@@ -8,13 +8,13 @@ import (
 // SortableMetrics lists the --sort-by keys accepted by `list`, mapped to
 // their resource_utilization accessor.
 var SortableMetrics = map[string]func(ResourceUtilization) float64{
-	"gpu-utilization": func(r ResourceUtilization) float64 { return r.AvgGPUUtilizationPct },
-	"gpu-memory":      func(r ResourceUtilization) float64 { return r.AvgGPUMemoryUsedMiB },
-	"gpu-power":       func(r ResourceUtilization) float64 { return r.AvgGPUPowerWatts },
-	"cpu-usage":       func(r ResourceUtilization) float64 { return r.AvgCPUUsageCores },
-	"memory-usage":    func(r ResourceUtilization) float64 { return r.AvgMemoryUsageGB },
-	"network-rx":      func(r ResourceUtilization) float64 { return r.AvgNetworkReceiveMbps },
-	"network-tx":      func(r ResourceUtilization) float64 { return r.AvgNetworkTransmitMbps },
+	"gpu-utilization": func(r ResourceUtilization) float64 { return r.MetricAvg("gpu_utilization") },
+	"gpu-memory":      func(r ResourceUtilization) float64 { return r.MetricAvg("gpu_memory_used") },
+	"gpu-power":       func(r ResourceUtilization) float64 { return r.MetricAvg("gpu_power") },
+	"cpu-usage":       func(r ResourceUtilization) float64 { return r.MetricAvg("cpu_usage") },
+	"memory-usage":    func(r ResourceUtilization) float64 { return r.MetricAvg("memory_usage") },
+	"network-rx":      func(r ResourceUtilization) float64 { return r.MetricAvg("network_receive") },
+	"network-tx":      func(r ResourceUtilization) float64 { return r.MetricAvg("network_transmit") },
 }
 
 // SortByMetric sorts items in place by the named performance metric,

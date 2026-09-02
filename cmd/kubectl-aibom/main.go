@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -232,6 +233,57 @@ var metricLabels = map[string]string{
 	"network-tx":      "NET TX MBPS",
 }
 
+// telemetryMetricOrder and telemetryMetricLabels give a fixed display order
+// and label for ResourceUtilization.Metrics, which is keyed by the same raw
+// names as aibom-webhook-service's TELEMETRY_QUERIES (a Go map has no
+// inherent order).
+var telemetryMetricOrder = []string{
+	"gpu_utilization", "gpu_memory_used", "gpu_power",
+	"cpu_usage", "memory_usage", "network_receive", "network_transmit",
+}
+
+var telemetryMetricLabels = map[string]string{
+	"gpu_utilization":  "GPU Utilization",
+	"gpu_memory_used":  "GPU Memory",
+	"gpu_power":        "GPU Power",
+	"cpu_usage":        "CPU Usage",
+	"memory_usage":     "Memory Usage",
+	"network_receive":  "Network RX",
+	"network_transmit": "Network TX",
+}
+
+// colorizeShape wraps each arrow rune in a Sparkline() shape with its own
+// direction's color (green for ↗, red for ↘, yellow for →), rather than one
+// color for the whole string based on the metric's overall Trend(). A mixed
+// shape like "↘↗" (dip then recover) needs both colors -- painting the whole
+// thing one color (e.g. yellow for Trend()'s "volatile" verdict) would make
+// the same ↘ glyph appear red in one row (a metric classified "down") and
+// yellow in another (a metric classified "volatile"), which reads as
+// inconsistent even though both rows show a real decline at that point.
+func colorizeShape(shape string) string {
+	var b strings.Builder
+	for _, r := range shape {
+		switch r {
+		case '↗':
+			b.WriteString(green(string(r)))
+		case '↘':
+			b.WriteString(red(string(r)))
+		case '→':
+			b.WriteString(yellow(string(r)))
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func formatSegment(v *float64) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.2f", *v)
+}
+
 func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 	metricHeader, metricGet := "", aibom.SortableMetrics[sortBy]
 	if sortBy != "" {
@@ -319,19 +371,57 @@ func printDescribe(a aibom.AIBOM) {
 	if ru.Note != "" {
 		fmt.Printf("  %s\n", ru.Note)
 	} else {
-		fmt.Printf("  GPU Utilization: %.2f%%\n", ru.AvgGPUUtilizationPct)
-		fmt.Printf("  GPU Memory Used: %.2f MiB\n", ru.AvgGPUMemoryUsedMiB)
-		fmt.Printf("  GPU Power:       %.2f W\n", ru.AvgGPUPowerWatts)
-		fmt.Printf("  CPU Usage:       %.2f cores\n", ru.AvgCPUUsageCores)
-		fmt.Printf("  Memory Usage:    %.2f GB\n", ru.AvgMemoryUsageGB)
-		fmt.Printf("  Network RX/TX:   %.2f / %.2f Mbps\n", ru.AvgNetworkReceiveMbps, ru.AvgNetworkTransmitMbps)
+		fmt.Printf("  GPU Utilization: %.2f%%\n", ru.MetricAvg("gpu_utilization"))
+		fmt.Printf("  GPU Memory Used: %.2f MiB\n", ru.MetricAvg("gpu_memory_used"))
+		fmt.Printf("  GPU Power:       %.2f W\n", ru.MetricAvg("gpu_power"))
+		fmt.Printf("  CPU Usage:       %.2f cores\n", ru.MetricAvg("cpu_usage"))
+		fmt.Printf("  Memory Usage:    %.2f GB\n", ru.MetricAvg("memory_usage"))
+		fmt.Printf("  Network RX/TX:   %.2f / %.2f Mbps\n", ru.MetricAvg("network_receive"), ru.MetricAvg("network_transmit"))
 		if ru.SummaryIncludesColdStart {
 			fmt.Println("  (includes cold start)")
 		}
 		for _, link := range ru.GrafanaLinks {
 			fmt.Printf("  Grafana:         %s\n", link)
 		}
+		printMetricDetail(ru)
 	}
+}
+
+// printMetricDetail prints the min/max/p95 and within-run shape for each
+// metric in ru.Metrics -- detail a flat average can't show, e.g. whether GPU
+// utilization held steady or throttled down partway through the run. Silent
+// no-op if the AIBOM predates this field (an older postprocess.py). Rendered
+// as a table (not manually padded Printf columns) since the values span
+// wildly different magnitudes across metrics (e.g. "28.00" vs "20500.00"),
+// which fixed-width padding can't keep aligned.
+func printMetricDetail(ru aibom.ResourceUtilization) {
+	if len(ru.Metrics) == 0 {
+		return
+	}
+	fmt.Println()
+	fmt.Println(bold("Performance Detail:"))
+	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "P95", "UNIT", "1ST -> MID -> LAST", "SHAPE")}
+	for _, key := range telemetryMetricOrder {
+		m, ok := ru.Metrics[key]
+		if !ok {
+			continue
+		}
+		segmentsText := fmt.Sprintf(
+			"%s -> %s -> %s",
+			formatSegment(m.Segments.FirstThird), formatSegment(m.Segments.MiddleThird), formatSegment(m.Segments.LastThird),
+		)
+		rows = append(rows, []cell{
+			labelCell(telemetryMetricLabels[key]),
+			plainCell(formatMetric(m.Min)),
+			plainCell(formatMetric(m.Avg)),
+			plainCell(formatMetric(m.Max)),
+			plainCell(formatMetric(m.P95)),
+			plainCell(m.Unit),
+			plainCell(segmentsText),
+			shapeCell(m.Segments.Sparkline()),
+		})
+	}
+	writeTable(os.Stdout, rows)
 }
 
 func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.MetricDiff) {
@@ -356,13 +446,46 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 		changeText := formatPctChange(m.PctChange)
 		rows = append(rows, []cell{
 			labelCell(m.Metric),
-			plainCell(formatMetric(m.A)),
-			plainCell(formatMetric(m.B)),
+			metricCellWithShape(m.A, m.ShapeA),
+			metricCellWithShape(m.B, m.ShapeB),
 			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
 			coloredCell(changeText, colorBySign(m.PctChange, changeText)),
 		})
 	}
 	writeTable(os.Stdout, rows)
+}
+
+// metricCellWithShape appends a within-run arrow sparkline (see
+// MetricSegments.Sparkline) to a metric value, when known -- e.g. "75.00 ↘↗"
+// flags that a run's own average dipped then recovered, a distinction the
+// cross-run delta/change columns can't make on their own.
+func metricCellWithShape(v float64, shape string) cell {
+	if shape == "" {
+		return plainCell(formatMetric(v))
+	}
+	return joinShapeCell(formatMetric(v), shape)
+}
+
+// shapeCell renders a bare arrow sparkline (see MetricSegments.Sparkline)
+// as its own cell, e.g. for printMetricDetail's SHAPE column.
+func shapeCell(shape string) cell {
+	if shape == "" {
+		return plainCell("")
+	}
+	return joinShapeCell("", shape)
+}
+
+// joinShapeCell joins text and shape with a space (or returns shape alone if
+// text is empty), colorizing each arrow in shape individually (see
+// colorizeShape). Built as a cell (not a plain string) so the color escape
+// codes don't get counted by writeTable's column-width calculation.
+func joinShapeCell(text, shape string) cell {
+	visible, rendered := shape, colorizeShape(shape)
+	if text != "" {
+		visible = text + " " + visible
+		rendered = text + " " + rendered
+	}
+	return coloredCell(visible, rendered)
 }
 
 func printCompare(items []aibom.AIBOM) {
@@ -394,13 +517,13 @@ func printCompare(items []aibom.AIBOM) {
 		label string
 		get   func(aibom.ResourceUtilization) float64
 	}{
-		{"GPU Utilization %", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUUtilizationPct }},
-		{"GPU Memory (MiB)", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUMemoryUsedMiB }},
-		{"GPU Power (W)", func(r aibom.ResourceUtilization) float64 { return r.AvgGPUPowerWatts }},
-		{"CPU Usage (cores)", func(r aibom.ResourceUtilization) float64 { return r.AvgCPUUsageCores }},
-		{"Memory Usage (GB)", func(r aibom.ResourceUtilization) float64 { return r.AvgMemoryUsageGB }},
-		{"Network RX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.AvgNetworkReceiveMbps }},
-		{"Network TX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.AvgNetworkTransmitMbps }},
+		{"GPU Utilization %", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_utilization") }},
+		{"GPU Memory (MiB)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_memory_used") }},
+		{"GPU Power (W)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_power") }},
+		{"CPU Usage (cores)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("cpu_usage") }},
+		{"Memory Usage (GB)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("memory_usage") }},
+		{"Network RX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("network_receive") }},
+		{"Network TX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("network_transmit") }},
 	} {
 		row(m.label, func(a aibom.AIBOM) string {
 			if a.Data.ResourceUtilization.Note != "" {
