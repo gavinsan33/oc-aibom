@@ -4,7 +4,10 @@
 // training/fine-tuning/inference workload.
 package aibom
 
-import "math"
+import (
+	"math"
+	"time"
+)
 
 // AIBOM mirrors the schema-enforced top-level fields of an AIBOM custom
 // resource's spec, plus the free-form spec.data document (preserved
@@ -53,10 +56,30 @@ type Pod struct {
 	StartTime    string `json:"start_time"`
 }
 
+// ExecutionMetadata's DurationSeconds is a pointer since compile_aibom()
+// omits it whenever no pod start_time was available to compute it from --
+// not the same as a zero-second run. It's the only new value added on top
+// of Pods; the start/end timestamps it's derived from (the earliest of
+// Pods[].StartTime, and _metadata.generated_at) are deliberately not
+// duplicated here, so there's a single source of truth for each timestamp.
 type ExecutionMetadata struct {
-	JobID     string `json:"job_id"`
-	Namespace string `json:"namespace"`
-	Pods      []Pod  `json:"pods"`
+	JobID           string   `json:"job_id"`
+	Namespace       string   `json:"namespace"`
+	Pods            []Pod    `json:"pods"`
+	DurationSeconds *float64 `json:"duration_seconds"`
+}
+
+// Duration renders DurationSeconds as a compact human-readable string (e.g.
+// "1h5m30s", "45s"), or "-" if it wasn't available. Keeping the raw seconds
+// in the stored AIBOM data and doing this formatting here, at display time,
+// means any future change to how duration is presented doesn't require
+// re-collecting or reformatting already-created (immutable) AIBOMs.
+func (e ExecutionMetadata) Duration() string {
+	if e.DurationSeconds == nil {
+		return "-"
+	}
+	d := time.Duration(*e.DurationSeconds) * time.Second
+	return d.String()
 }
 
 type SpeculativeDecoding struct {
