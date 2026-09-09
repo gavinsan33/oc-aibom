@@ -335,6 +335,7 @@ func printDescribe(a aibom.AIBOM) {
 	fmt.Printf("Job:               %s\n", a.JobName)
 	fmt.Printf("Experiment Intent: %s\n", a.ExperimentIntent)
 	fmt.Printf("Collected At:      %s\n", a.CollectedAt)
+	fmt.Printf("Runtime:           %s\n", a.Data.ExecutionMetadata.Duration())
 	fmt.Println()
 	fmt.Println(bold("Model:"))
 	fmt.Printf("  Name:          %s\n", a.Data.Model.Name)
