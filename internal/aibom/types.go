@@ -82,6 +82,26 @@ func (e ExecutionMetadata) Duration() string {
 	return d.String()
 }
 
+// EarliestPodStart returns the start_time of whichever pod started first (a
+// JobSet can have sibling pods that started at slightly different times), or
+// "" if no pod reported one. Computed here at display time from Pods rather
+// than stored separately, so there's one source of truth for pod start
+// times. String comparison is sufficient since start_time is always
+// ISO-8601 in the same format, where lexicographic order matches
+// chronological order.
+func (e ExecutionMetadata) EarliestPodStart() string {
+	var earliest string
+	for _, p := range e.Pods {
+		if p.StartTime == "" {
+			continue
+		}
+		if earliest == "" || p.StartTime < earliest {
+			earliest = p.StartTime
+		}
+	}
+	return earliest
+}
+
 type SpeculativeDecoding struct {
 	Enabled              bool   `json:"enabled"`
 	DraftModel           string `json:"draft_model"`
