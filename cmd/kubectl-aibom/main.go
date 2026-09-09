@@ -99,6 +99,7 @@ func main() {
 	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric: gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx (highest first)")
 	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first)")
 
+	var brief bool
 	getCmd := &cobra.Command{
 		Use:               "describe <name>",
 		Short:             "Print a human-readable summary of a single AIBOM",
@@ -113,10 +114,11 @@ func main() {
 			if err != nil {
 				return err
 			}
-			printDescribe(a)
+			printDescribe(a, brief)
 			return nil
 		},
 	}
+	getCmd.Flags().BoolVarP(&brief, "brief", "b", false, "omit pod list, performance detail table, and AIBOM metadata")
 
 	diffCmd := &cobra.Command{
 		Use:               "diff <name-a> <name-b>",
@@ -240,16 +242,19 @@ var metricLabels = map[string]string{
 var telemetryMetricOrder = []string{
 	"gpu_utilization", "gpu_memory_used", "gpu_power",
 	"cpu_usage", "memory_usage", "network_receive", "network_transmit",
+	"storage_read_throughput", "storage_write_throughput",
 }
 
 var telemetryMetricLabels = map[string]string{
-	"gpu_utilization":  "GPU Utilization",
-	"gpu_memory_used":  "GPU Memory",
-	"gpu_power":        "GPU Power",
-	"cpu_usage":        "CPU Usage",
-	"memory_usage":     "Memory Usage",
-	"network_receive":  "Network RX",
-	"network_transmit": "Network TX",
+	"gpu_utilization":          "GPU Utilization",
+	"gpu_memory_used":          "GPU Memory",
+	"gpu_power":                "GPU Power",
+	"cpu_usage":                "CPU Usage",
+	"storage_read_throughput":  "Storage Read",
+	"storage_write_throughput": "Storage Write",
+	"memory_usage":             "Memory Usage",
+	"network_receive":          "Network RX",
+	"network_transmit":         "Network TX",
 }
 
 // colorizeShape wraps each arrow rune in a Sparkline() shape with its own
@@ -329,10 +334,16 @@ func formatPctChange(v float64) string {
 	return fmt.Sprintf("%+.1f%%", v)
 }
 
-func printDescribe(a aibom.AIBOM) {
+func printDescribe(a aibom.AIBOM, brief bool) {
 	fmt.Printf("Name:              %s\n", a.Name)
 	fmt.Printf("Namespace:         %s\n", a.Namespace)
 	fmt.Printf("Job:               %s\n", a.JobName)
+	if a.Data.ExperimentName != "" && a.Data.ExperimentName != a.JobName {
+		fmt.Printf("Experiment:        %s\n", a.Data.ExperimentName)
+	}
+	if a.Data.ExperimentDescription != "" {
+		fmt.Printf("Description:       %s\n", a.Data.ExperimentDescription)
+	}
 	fmt.Printf("Experiment Intent: %s\n", a.ExperimentIntent)
 	fmt.Printf("Collected At:      %s\n", a.CollectedAt)
 	fmt.Printf("Runtime:           %s\n", a.Data.ExecutionMetadata.Duration())
@@ -342,16 +353,22 @@ func printDescribe(a aibom.AIBOM) {
 	fmt.Printf("  Version:       %s\n", a.Data.Model.Version)
 	fmt.Printf("  Architecture:  %s\n", a.Data.Model.Architecture)
 	fmt.Printf("  Framework:     %s\n", a.Data.Model.Framework)
+	fmt.Printf("  Dtype:         %s\n", a.Data.Model.Dtype)
 	fmt.Printf("  Quantization:  %s (%d-bit)\n", a.Data.Model.Quantization, a.Data.Model.QuantizationBits)
+	if sd := a.Data.Model.SpeculativeDecoding; sd != nil {
+		fmt.Printf("  Speculative Decoding: %s (draft: %s, tokens: %d)\n", boolStr(sd.Enabled), sd.DraftModel, sd.NumSpeculativeTokens)
+	}
 	fmt.Println()
 	fmt.Println(bold("Dataset:"))
-	fmt.Printf("  Declared:      %s %s (license: %s)\n", a.Data.Dataset.Declared.Name, a.Data.Dataset.Declared.Version, a.Data.Dataset.Declared.License)
+	fmt.Printf("  Declared:      %s %s (license: %s, via: %s)\n",
+		a.Data.Dataset.Declared.Name, a.Data.Dataset.Declared.Version,
+		a.Data.Dataset.Declared.License, a.Data.Dataset.Declared.DeclaredVia)
 	for _, d := range a.Data.Dataset.AutoDetected {
 		match := green("matches declared")
 		if !d.MatchesDeclared {
 			match = red("DOES NOT MATCH DECLARED")
 		}
-		fmt.Printf("  Auto-detected: %s %s (license: %s) — %s\n", d.DatasetName, d.Version, d.License, match)
+		fmt.Printf("  Auto-detected: %s %s (license: %s, seen via: %s) — %s\n", d.DatasetName, d.Version, d.License, d.SeenVia, match)
 	}
 	fmt.Println()
 	fmt.Println(bold("Source:"))
@@ -360,32 +377,91 @@ func printDescribe(a aibom.AIBOM) {
 	if a.Data.SourceCode.Dirty {
 		dirty = yellow(dirty)
 	}
-	fmt.Printf("  Commit:        %s (branch: %s, dirty: %s)\n", a.Data.SourceCode.GitCommit, a.Data.SourceCode.GitBranch, dirty)
+	fmt.Printf("  Commit:        %s (branch: %s, dirty: %s, via: %s)\n",
+		a.Data.SourceCode.GitCommit, a.Data.SourceCode.GitBranch, dirty, a.Data.SourceCode.DeclaredVia)
+
+	if t := a.Data.Training; t != nil {
+		fmt.Println()
+		fmt.Println(bold("Training:"))
+		fmt.Printf("  Optimizer:              %s\n", t.Optimizer)
+		fmt.Printf("  Learning Rate:          %v\n", t.LearningRate)
+		fmt.Printf("  Batch Size:             %v\n", t.BatchSize)
+		fmt.Printf("  Epochs:                 %v\n", t.Epochs)
+		fmt.Printf("  Random Seed:            %v\n", t.RandomSeed)
+		fmt.Printf("  Parallelization:        %s\n", t.ParallelizationStrategy)
+	}
+	if ft := a.Data.FineTuning; ft != nil {
+		fmt.Println()
+		fmt.Println(bold("Fine-Tuning:"))
+		fmt.Printf("  Adaptation Method: %s\n", ft.AdaptationMethod)
+		fmt.Printf("  LoRA Rank/Alpha:   %v / %v\n", ft.LoRARank, ft.LoRAAlpha)
+	}
+	if inf := a.Data.Inference; inf != nil {
+		fmt.Println()
+		fmt.Println(bold("Inference:"))
+		fmt.Printf("  Serving Engine:       %s\n", inf.ServingEngine)
+		fmt.Printf("  Max Model Len:        %v\n", inf.MaxModelLen)
+		fmt.Printf("  Tensor/Pipeline/Data Parallel: %v / %v / %v\n", inf.TensorParallelSize, inf.PipelineParallelSize, inf.DataParallelSize)
+		fmt.Printf("  Expert Parallel:      %s\n", boolStr(inf.EnableExpertParallel))
+		fmt.Printf("  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
+		fmt.Printf("  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
+		fmt.Printf("  Max Tokens:           %d\n", inf.MaxTokens)
+	}
+
 	fmt.Println()
 	fmt.Println("Environment:")
 	fmt.Printf("  GPU:           %s x%d\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount)
+	fmt.Printf("  CPU:           %s x%d\n", a.Data.Environment.CPUModel, a.Data.Environment.CPUCores)
+	fmt.Printf("  Memory:        %.2f GB (%d NUMA node(s))\n", a.Data.Environment.MemoryGB, a.Data.Environment.NUMANodes)
 	fmt.Printf("  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
 	fmt.Printf("  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
+	fmt.Printf("  Kernel:        %s\n", a.Data.Environment.KernelVersion)
+
+	if !brief {
+		fmt.Println()
+		fmt.Println(bold("Pods:"))
+		for _, p := range a.Data.ExecutionMetadata.Pods {
+			fmt.Printf("  %s  node=%s  ip=%s  start=%s\n", p.PodName, p.NodeName, p.PodIP, p.StartTime)
+		}
+	}
+
 	fmt.Println()
 	fmt.Println("Performance:")
 	ru := a.Data.ResourceUtilization
 	if ru.Note != "" {
 		fmt.Printf("  %s\n", ru.Note)
 	} else {
-		fmt.Printf("  GPU Utilization: %.2f%%\n", ru.MetricAvg("gpu_utilization"))
-		fmt.Printf("  GPU Memory Used: %.2f MiB\n", ru.MetricAvg("gpu_memory_used"))
-		fmt.Printf("  GPU Power:       %.2f W\n", ru.MetricAvg("gpu_power"))
-		fmt.Printf("  CPU Usage:       %.2f cores\n", ru.MetricAvg("cpu_usage"))
-		fmt.Printf("  Memory Usage:    %.2f GB\n", ru.MetricAvg("memory_usage"))
-		fmt.Printf("  Network RX/TX:   %.2f / %.2f Mbps\n", ru.MetricAvg("network_receive"), ru.MetricAvg("network_transmit"))
+		for _, key := range telemetryMetricOrder {
+			m, ok := ru.Metrics[key]
+			if !ok {
+				continue
+			}
+			fmt.Printf("  %-16s %.2f %s\n", telemetryMetricLabels[key]+":", m.Avg, m.Unit)
+		}
 		if ru.SummaryIncludesColdStart {
 			fmt.Println("  (includes cold start)")
 		}
 		for _, link := range ru.GrafanaLinks {
 			fmt.Printf("  Grafana:         %s\n", link)
 		}
-		printMetricDetail(ru)
+		if !brief {
+			printMetricDetail(ru)
+		}
 	}
+
+	if !brief {
+		fmt.Println()
+		fmt.Println(bold("AIBOM Metadata:"))
+		fmt.Printf("  Version:            %s\n", a.Data.Metadata.AIBOMVersion)
+		fmt.Printf("  Generated At:       %s\n", a.Data.Metadata.GeneratedAt)
+		fmt.Printf("  Generator:          %s\n", a.Data.Metadata.Generator)
+		fmt.Printf("  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
+		fmt.Printf("  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
+	}
+}
+
+func boolStr(b bool) string {
+	return fmt.Sprintf("%v", b)
 }
 
 // printMetricDetail prints the min/max/p95 and within-run shape for each
