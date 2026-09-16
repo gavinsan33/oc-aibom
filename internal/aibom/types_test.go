@@ -33,6 +33,28 @@ func TestPodStatusUnmarshalNull(t *testing.T) {
 	}
 }
 
+func TestMetricStatsUnmarshalWithLimit(t *testing.T) {
+	raw := `{"unit": "GB", "min": 2, "max": 8, "avg": 5, "p95": 7.8, "limit": 8, "segments": {}}`
+	var m MetricStats
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if m.Limit == nil || *m.Limit != 8 {
+		t.Errorf("Limit = %v, want 8", m.Limit)
+	}
+}
+
+func TestMetricStatsUnmarshalNoLimit(t *testing.T) {
+	raw := `{"unit": "percent", "min": 10, "max": 95, "avg": 60, "p95": 94, "limit": null, "segments": {}}`
+	var m MetricStats
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if m.Limit != nil {
+		t.Errorf("Limit = %v, want nil", m.Limit)
+	}
+}
+
 func TestMetricSegmentsTrend(t *testing.T) {
 	cases := []struct {
 		name             string
