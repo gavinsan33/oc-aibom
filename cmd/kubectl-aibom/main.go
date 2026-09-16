@@ -75,8 +75,12 @@ func main() {
 				items = aibom.DriftOnly(items)
 			}
 			switch sortBy {
-			case "":
-			case "age":
+			case "", "age":
+				// Default: List() itself only sorts alphabetically by
+				// namespace/name (kept that way since completeAIBOMNames
+				// also relies on it, for tab-completion), so `list` applies
+				// its own default of oldest-first by age on top of that
+				// unless a different --sort-by metric is requested.
 				aibom.SortByAge(items, ascending)
 			default:
 				if err := aibom.SortByMetric(items, sortBy, ascending); err != nil {
@@ -101,8 +105,8 @@ func main() {
 	listCmd.Flags().StringVar(&adaptationMethodFilter, "adaptation-method", "", "filter by fine_tuning.adaptation_method")
 	listCmd.Flags().StringVar(&optimizerFilter, "optimizer", "", "filter by training.optimizer")
 	listCmd.Flags().BoolVar(&driftOnly, "drift-only", false, "only show AIBOMs where auto-detected dataset(s) disagree with the declared dataset")
-	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx) or 'age' (highest first, i.e. oldest AIBOM first)")
-	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first, i.e. most recently collected first for --sort-by=age)")
+	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx); defaults to 'age' (oldest AIBOM first)")
+	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first; for the default age sort, shows most recently collected first)")
 
 	var brief bool
 	getCmd := &cobra.Command{
