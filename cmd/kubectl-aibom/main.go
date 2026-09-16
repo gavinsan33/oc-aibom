@@ -371,7 +371,7 @@ func printDescribe(a aibom.AIBOM, brief bool) {
 		if !d.MatchesDeclared {
 			match = red("DOES NOT MATCH DECLARED")
 		}
-		fmt.Printf("  Auto-detected: %s %s (license: %s, seen via: %s) — %s\n", d.DatasetName, d.Version, d.License, d.SeenVia, match)
+		fmt.Printf("  Auto-detected: %s %s (license: %s, seen via: %s) — %s\n", d.DatasetName, d.Version, d.License, strings.Join(d.SeenVia, ", "), match)
 	}
 	fmt.Println()
 	fmt.Println(bold("Source:"))
