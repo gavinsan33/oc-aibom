@@ -128,11 +128,11 @@ type DeclaredDataset struct {
 }
 
 type AutoDetectedDataset struct {
-	DatasetName     string `json:"dataset_name"`
-	Version         string `json:"version"`
-	License         string `json:"license"`
-	MatchesDeclared bool   `json:"matches_declared"`
-	SeenVia         string `json:"seen_via"`
+	DatasetName     string   `json:"dataset_name"`
+	Version         string   `json:"version"`
+	License         string   `json:"license"`
+	MatchesDeclared bool     `json:"matches_declared"`
+	SeenVia         []string `json:"seen_via"`
 }
 
 type Dataset struct {
