@@ -1,6 +1,37 @@
 package aibom
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestPodStatusUnmarshal(t *testing.T) {
+	raw := `{"pod_name": "job-abc", "status": "OOMKilled", "exit_code": 137}`
+	var p Pod
+	if err := json.Unmarshal([]byte(raw), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if p.Status != "OOMKilled" {
+		t.Errorf("Status = %q, want OOMKilled", p.Status)
+	}
+	if p.ExitCode == nil || *p.ExitCode != 137 {
+		t.Errorf("ExitCode = %v, want 137", p.ExitCode)
+	}
+}
+
+func TestPodStatusUnmarshalNull(t *testing.T) {
+	raw := `{"pod_name": "job-abc", "status": null, "exit_code": null}`
+	var p Pod
+	if err := json.Unmarshal([]byte(raw), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if p.Status != "" {
+		t.Errorf("Status = %q, want empty", p.Status)
+	}
+	if p.ExitCode != nil {
+		t.Errorf("ExitCode = %v, want nil", p.ExitCode)
+	}
+}
 
 func TestMetricSegmentsTrend(t *testing.T) {
 	cases := []struct {

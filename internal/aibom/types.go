@@ -47,6 +47,10 @@ type SourceCode struct {
 	Dirty         bool   `json:"dirty"`
 }
 
+// Status/ExitCode reflect how the pod's containers actually terminated (e.g.
+// "OOMKilled"/137, "Completed"/0), read by the watcher from the live Pod
+// object at postprocess time -- not something knowable at pod startup. Both
+// are nil when no container ever reported a terminated state to the watcher.
 type Pod struct {
 	PodName      string `json:"pod_name"`
 	PodUID       string `json:"pod_uid"`
@@ -54,6 +58,8 @@ type Pod struct {
 	PodIP        string `json:"pod_ip"`
 	NodeName     string `json:"node_name"`
 	StartTime    string `json:"start_time"`
+	Status       string `json:"status"`
+	ExitCode     *int   `json:"exit_code"`
 }
 
 // ExecutionMetadata's DurationSeconds is a pointer since compile_aibom()
@@ -67,6 +73,10 @@ type ExecutionMetadata struct {
 	Namespace       string   `json:"namespace"`
 	Pods            []Pod    `json:"pods"`
 	DurationSeconds *float64 `json:"duration_seconds"`
+	// Status rolls up every pod's own Status (OOMKilled wins over any other
+	// non-Completed status even if only one JobSet sibling hit it); "" if no
+	// pod reported a status at all.
+	Status string `json:"status"`
 }
 
 // Duration renders DurationSeconds as a compact human-readable string (e.g.

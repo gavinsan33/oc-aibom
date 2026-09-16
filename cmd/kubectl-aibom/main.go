@@ -304,7 +304,7 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 		metricHeader = metricLabels[sortBy]
 	}
 
-	cols := []string{"NAME", "JOB", "MODEL", "INTENT", "QUANTIZATION", "GPU TYPE", "AGE"}
+	cols := []string{"NAME", "JOB", "MODEL", "INTENT", "QUANTIZATION", "GPU TYPE", "AGE", "STATUS"}
 	if allNamespaces {
 		cols = append([]string{"NAMESPACE"}, cols...)
 	}
@@ -321,10 +321,12 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 		if allNamespaces {
 			values = append([]string{a.Namespace}, values...)
 		}
+		row := plainRow(values...)
+		row = append(row, statusCell(a.Data.ExecutionMetadata.Status, nil))
 		if metricGet != nil {
-			values = append(values, formatMetric(metricGet(a.Data.ResourceUtilization)))
+			row = append(row, plainCell(formatMetric(metricGet(a.Data.ResourceUtilization))))
 		}
-		rows = append(rows, plainRow(values...))
+		rows = append(rows, row)
 	}
 	writeTable(os.Stdout, rows)
 	if len(items) == 0 {
@@ -358,6 +360,39 @@ func humanAge(collectedAt string) string {
 	}
 }
 
+// statusCell renders a pod/execution-metadata status colored by severity:
+// red for OOMKilled (the specific failure this was added to surface -- see
+// CLAUDE.md's Pod Termination Status section), yellow for any other
+// non-Completed status, green for Completed, and "-" when the watcher never
+// captured a container status at all (not the same as a clean exit).
+// exitCode is only appended when present -- the job-level rollup
+// (ExecutionMetadata.Status) never carries one, since it's a single value
+// merged across every pod, not a signal from one specific container.
+func statusCell(status string, exitCode *int) cell {
+	if status == "" {
+		return plainCell("-")
+	}
+	text := status
+	if exitCode != nil {
+		text = fmt.Sprintf("%s (exit %d)", status, *exitCode)
+	}
+	switch status {
+	case "OOMKilled":
+		return coloredCell(text, red(text))
+	case "Completed":
+		return coloredCell(text, green(text))
+	default:
+		return coloredCell(text, yellow(text))
+	}
+}
+
+// formatPodStatus is statusCell's rendered text for plain (non-table)
+// output, e.g. printDescribe's fmt.Printf lines, which don't need visible
+// vs. rendered width tracking the way writeTable's columns do.
+func formatPodStatus(status string, exitCode *int) string {
+	return statusCell(status, exitCode).rendered
+}
+
 func formatMetric(v float64) string {
 	return fmt.Sprintf("%.2f", v)
 }
@@ -385,6 +420,7 @@ func printDescribe(a aibom.AIBOM, brief bool) {
 		a.Data.ExecutionMetadata.EarliestPodStart(),
 		a.CollectedAt,
 	)
+	fmt.Printf("Status:            %s\n", formatPodStatus(a.Data.ExecutionMetadata.Status, nil))
 	fmt.Println()
 	fmt.Println(bold("Model:"))
 	fmt.Printf("  Name:          %s\n", a.Data.Model.Name)
@@ -459,7 +495,8 @@ func printDescribe(a aibom.AIBOM, brief bool) {
 		fmt.Println()
 		fmt.Println(bold("Pods:"))
 		for _, p := range a.Data.ExecutionMetadata.Pods {
-			fmt.Printf("  %s  node=%s  ip=%s  start=%s\n", p.PodName, p.NodeName, p.PodIP, p.StartTime)
+			fmt.Printf("  %s  node=%s  ip=%s  start=%s  status=%s\n",
+				p.PodName, p.NodeName, p.PodIP, p.StartTime, formatPodStatus(p.Status, p.ExitCode))
 		}
 	}
 
