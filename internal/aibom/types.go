@@ -310,12 +310,18 @@ func (s MetricSegments) Sparkline() string {
 // names as aibom-webhook-service's TELEMETRY_QUERIES: gpu_utilization,
 // gpu_memory_used, gpu_power, cpu_usage, memory_usage, network_receive,
 // network_transmit.
+// Limit is only present for memory_usage/cpu_usage (the only metrics with a
+// Kubernetes resource-limit concept) and only when the workload's
+// containers actually set one -- nil otherwise, not the same as a limit of
+// 0. See CLAUDE.md's Segmented Performance Stats section for how it's
+// resolved across a JobSet's sibling pods (the tightest limit wins).
 type MetricStats struct {
 	Unit     string         `json:"unit"`
 	Min      float64        `json:"min"`
 	Max      float64        `json:"max"`
 	Avg      float64        `json:"avg"`
 	P95      float64        `json:"p95"`
+	Limit    *float64       `json:"limit"`
 	Segments MetricSegments `json:"segments"`
 }
 

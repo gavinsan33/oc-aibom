@@ -552,7 +552,7 @@ func printMetricDetail(ru aibom.ResourceUtilization) {
 	}
 	fmt.Println()
 	fmt.Println(bold("Performance Detail:"))
-	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "P95", "UNIT", "1ST -> MID -> LAST", "SHAPE")}
+	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "LIMIT", "P95", "UNIT", "1ST -> MID -> LAST", "SHAPE")}
 	for _, key := range telemetryMetricOrder {
 		m, ok := ru.Metrics[key]
 		if !ok {
@@ -566,7 +566,8 @@ func printMetricDetail(ru aibom.ResourceUtilization) {
 			labelCell(telemetryMetricLabels[key]),
 			plainCell(formatMetric(m.Min)),
 			plainCell(formatMetric(m.Avg)),
-			plainCell(formatMetric(m.Max)),
+			maxCell(m.Max, m.Limit),
+			limitCell(m.Limit),
 			plainCell(formatMetric(m.P95)),
 			plainCell(m.Unit),
 			plainCell(segmentsText),
@@ -574,6 +575,37 @@ func printMetricDetail(ru aibom.ResourceUtilization) {
 		})
 	}
 	writeTable(os.Stdout, rows)
+}
+
+// limitCell renders a metric's configured resource limit, or "-" for a
+// metric with no limit concept (GPU/network/storage) or one where no
+// container in the workload actually set one.
+func limitCell(limit *float64) cell {
+	if limit == nil {
+		return plainCell("-")
+	}
+	return plainCell(formatMetric(*limit))
+}
+
+// maxCell colors MAX by how close it ran to the metric's limit (when one is
+// present) -- red at/above the limit (a near-certain contributor to
+// whatever killed the pod; cross-reference the pod's own Status), yellow
+// within 10% of it (a near-miss worth noting even on a Completed pod, since
+// no explicit status field would otherwise surface it -- see CLAUDE.md's
+// Segmented Performance Stats section), plain otherwise.
+func maxCell(max float64, limit *float64) cell {
+	text := formatMetric(max)
+	if limit == nil || *limit <= 0 {
+		return plainCell(text)
+	}
+	switch pct := max / *limit; {
+	case pct >= 1.0:
+		return coloredCell(text, red(text))
+	case pct >= 0.9:
+		return coloredCell(text, yellow(text))
+	default:
+		return plainCell(text)
+	}
 }
 
 func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.MetricDiff) {
