@@ -3,6 +3,7 @@ package aibom
 import (
 	"fmt"
 	"sort"
+	"time"
 )
 
 // SortableMetrics lists the --sort-by keys accepted by `list`, mapped to
@@ -33,4 +34,23 @@ func SortByMetric(items []AIBOM, metric string, ascending bool) error {
 		return vi > vj
 	})
 	return nil
+}
+
+// SortByAge sorts items by CollectedAt. Default order is oldest first (the
+// "highest value" direction, matching SortByMetric's default -- "age" is
+// largest for the oldest AIBOM); ascending reverses that to most-recently-
+// collected first. Items with an unparseable/missing CollectedAt sort last
+// regardless of direction.
+func SortByAge(items []AIBOM, ascending bool) {
+	sort.SliceStable(items, func(i, j int) bool {
+		ti, erri := time.Parse(time.RFC3339, items[i].CollectedAt)
+		tj, errj := time.Parse(time.RFC3339, items[j].CollectedAt)
+		if erri != nil || errj != nil {
+			return errj != nil && erri == nil
+		}
+		if ascending {
+			return ti.After(tj)
+		}
+		return ti.Before(tj)
+	})
 }

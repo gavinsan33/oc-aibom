@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -73,7 +74,15 @@ func main() {
 			if driftOnly {
 				items = aibom.DriftOnly(items)
 			}
-			if sortBy != "" {
+			switch sortBy {
+			case "", "age":
+				// Default: List() itself only sorts alphabetically by
+				// namespace/name (kept that way since completeAIBOMNames
+				// also relies on it, for tab-completion), so `list` applies
+				// its own default of oldest-first by age on top of that
+				// unless a different --sort-by metric is requested.
+				aibom.SortByAge(items, ascending)
+			default:
 				if err := aibom.SortByMetric(items, sortBy, ascending); err != nil {
 					return err
 				}
@@ -96,8 +105,8 @@ func main() {
 	listCmd.Flags().StringVar(&adaptationMethodFilter, "adaptation-method", "", "filter by fine_tuning.adaptation_method")
 	listCmd.Flags().StringVar(&optimizerFilter, "optimizer", "", "filter by training.optimizer")
 	listCmd.Flags().BoolVar(&driftOnly, "drift-only", false, "only show AIBOMs where auto-detected dataset(s) disagree with the declared dataset")
-	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric: gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx (highest first)")
-	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first)")
+	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx); defaults to 'age' (oldest AIBOM first)")
+	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first; for the default age sort, shows most recently collected first)")
 
 	var brief bool
 	getCmd := &cobra.Command{
@@ -291,11 +300,11 @@ func formatSegment(v *float64) string {
 
 func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 	metricHeader, metricGet := "", aibom.SortableMetrics[sortBy]
-	if sortBy != "" {
+	if sortBy != "" && sortBy != "age" {
 		metricHeader = metricLabels[sortBy]
 	}
 
-	cols := []string{"NAME", "JOB", "MODEL", "INTENT", "QUANTIZATION", "GPU TYPE", "COLLECTED AT"}
+	cols := []string{"NAME", "JOB", "MODEL", "INTENT", "QUANTIZATION", "GPU TYPE", "AGE"}
 	if allNamespaces {
 		cols = append([]string{"NAMESPACE"}, cols...)
 	}
@@ -307,7 +316,7 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 	for _, a := range items {
 		values := []string{
 			a.Name, a.JobName, a.Data.Model.Name, a.ExperimentIntent,
-			a.Data.Model.Quantization, a.Data.Environment.GPUType, a.CollectedAt,
+			a.Data.Model.Quantization, a.Data.Environment.GPUType, humanAge(a.CollectedAt),
 		}
 		if allNamespaces {
 			values = append([]string{a.Namespace}, values...)
@@ -320,6 +329,32 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 	writeTable(os.Stdout, rows)
 	if len(items) == 0 {
 		fmt.Println("No AIBOMs found.")
+	}
+}
+
+// humanAge renders the time elapsed since collectedAt (an RFC3339
+// timestamp) the same way kubectl's own AGE column does for creation
+// timestamps -- a single coarse unit (42s, 12m, 3h, 5d) rather than the raw
+// timestamp, so a `list` row can be scanned at a glance instead of parsed.
+// Falls back to the ISO date once a record is old enough that a relative
+// unit stops being useful, and to "-" if collectedAt is missing/unparseable.
+func humanAge(collectedAt string) string {
+	t, err := time.Parse(time.RFC3339, collectedAt)
+	if err != nil {
+		return "-"
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd", int(d.Hours()/24))
+	default:
+		return t.Format("2006-01-02")
 	}
 }
 
