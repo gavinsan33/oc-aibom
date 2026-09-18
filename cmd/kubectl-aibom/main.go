@@ -119,11 +119,13 @@ func main() {
 			if err != nil {
 				return err
 			}
-			a, err := aibom.Get(context.Background(), client, namespace, args[0])
+			ctx := context.Background()
+			a, err := aibom.Get(ctx, client, namespace, args[0])
 			if err != nil {
 				return err
 			}
-			printDescribe(a, brief)
+			verifyResult := aibom.Verify(ctx, client, a)
+			printDescribe(a, verifyResult, brief)
 			return nil
 		},
 	}
@@ -404,7 +406,29 @@ func formatPctChange(v float64) string {
 	return fmt.Sprintf("%+.1f%%", v)
 }
 
-func printDescribe(a aibom.AIBOM, brief bool) {
+// formatVerify renders a Verify result the way printDescribe's other status
+// lines are rendered: green only for the one status that actually means
+// "trust this," yellow for anything that needs a human to look closer, red
+// for a confirmed mismatch, and plain (uncolored) for the common
+// not-signed-yet case, which isn't itself a bad sign.
+func formatVerify(r aibom.VerifyResult) string {
+	switch r.Status {
+	case aibom.VerifyValid:
+		return green("✓ Verified") + " (signature matches, key confirmed against cluster)"
+	case aibom.VerifyUnsigned:
+		return "not signed"
+	case aibom.VerifyUnconfirmed:
+		return yellow("signed (unconfirmed)") + " — " + r.Detail
+	case aibom.VerifyKeyMismatch:
+		return yellow("⚠ KEY MISMATCH") + " — " + r.Detail
+	case aibom.VerifyInvalid:
+		return red("✗ INVALID SIGNATURE") + " — " + r.Detail
+	default:
+		return r.Detail
+	}
+}
+
+func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, brief bool) {
 	fmt.Printf("Name:              %s\n", a.Name)
 	fmt.Printf("Namespace:         %s\n", a.Namespace)
 	fmt.Printf("Job:               %s\n", a.JobName)
@@ -421,6 +445,7 @@ func printDescribe(a aibom.AIBOM, brief bool) {
 		a.CollectedAt,
 	)
 	fmt.Printf("Status:            %s\n", formatPodStatus(a.Data.ExecutionMetadata.Status, nil))
+	fmt.Printf("Signature:         %s\n", formatVerify(verifyResult))
 	fmt.Println()
 	fmt.Println(bold("Model:"))
 	fmt.Printf("  Name:          %s\n", a.Data.Model.Name)

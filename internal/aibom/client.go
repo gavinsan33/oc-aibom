@@ -42,6 +42,14 @@ func fromUnstructured(obj *unstructured.Unstructured) (AIBOM, error) {
 	}
 	a.Name = obj.GetName()
 	a.Namespace = obj.GetNamespace()
+
+	// Preserved separately from the json.Unmarshal above (into the typed Data
+	// struct) so Verify can canonicalize the exact JSON tree that was signed,
+	// not a lossy re-encoding of the subset of fields Data knows about.
+	if rawData, ok, _ := unstructured.NestedMap(spec, "data"); ok {
+		a.RawData = rawData
+	}
+
 	return a, nil
 }
 
