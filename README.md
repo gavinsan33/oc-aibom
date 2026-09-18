@@ -98,6 +98,26 @@ metric's min/avg/max/p95 and its first→middle→last-third breakdown across
 the run, with a trend arrow (↑/↓/→) flagging runs that ramped up, throttled
 down, or held steady — something a single run-wide average can't show.
 
+A `Signature:` line reports whether the AIBOM's Ed25519 signature (see
+aibom-webhook-service's `CLAUDE.md`, "Compiled AIBOM Signing") checks out:
+
+- **`✓ Verified`** (green) — the signature matches the AIBOM's data, *and*
+  the embedded public key matches the one the cluster currently publishes.
+  The only status that should be read as "trust this."
+- **`not signed`** — no signature present, e.g. an AIBOM created before the
+  signing feature shipped, or in a namespace with no signing key configured.
+  Not itself a bad sign.
+- **`signed (unconfirmed)`** (yellow) — the signature is internally
+  consistent, but the cluster's published key couldn't be checked (no RBAC,
+  no network, or the ConfigMap doesn't exist yet). Weaker than `Verified`:
+  it only proves the signature matches *some* key, not that the key is the
+  cluster's real one.
+- **`⚠ KEY MISMATCH`** (yellow) — the signature is valid, but the embedded
+  key doesn't match the cluster's current published key. Can follow a
+  legitimate key rotation, or indicate the embedded key was forged.
+- **`✗ INVALID SIGNATURE`** (red) — the signature does not match the data.
+  This is the tamper/corruption case.
+
 ### `oc aibom diff <name-a> <name-b>`
 
 Field-by-field comparison of two AIBOMs: model config, dataset
