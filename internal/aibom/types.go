@@ -20,6 +20,24 @@ type AIBOM struct {
 	ExperimentIntent string `json:"experimentIntent"`
 	CollectedAt      string `json:"collectedAt"`
 	Data             Data   `json:"data"`
+
+	// Signature and SignaturePublicKey are base64 Ed25519 values postprocess.py
+	// writes at creation time (see aibom-webhook-service's CLAUDE.md, "Compiled
+	// AIBOM Signing"). Empty on an AIBOM created before that feature shipped, or
+	// in a namespace with no aibom-compiled-signing-key Secret -- not itself a
+	// sign of tampering, see Verify's Unsigned status.
+	Signature          string `json:"signature,omitempty"`
+	SignaturePublicKey string `json:"signaturePublicKey,omitempty"`
+
+	// RawData is spec.data decoded as a generic JSON tree (not the typed Data
+	// struct above), preserved specifically for Verify. The signature was
+	// computed by RFC-8785-canonicalizing the *exact* JSON postprocess.py held
+	// in memory; re-marshaling the typed Data struct would not reproduce that --
+	// struct field order isn't alphabetical, omitempty can drop fields that were
+	// present-but-empty in the original, and Data doesn't necessarily mirror
+	// every key compile_aibom() ever emits. RawData sidesteps all of that by
+	// never going through the typed struct at all.
+	RawData map[string]any `json:"-"`
 }
 
 // Data mirrors the fields compile_aibom() writes into spec.data.
