@@ -130,6 +130,13 @@ func runHeaderCell(i int, name string) cell {
 	return coloredCell(name, boldColorize(runColor(i), name))
 }
 
+// runCell renders a compare table's data cell in the i-th run's color (see
+// runColor), matching runHeaderCell so a whole column -- header and values
+// alike -- reads as one run at a glance.
+func runCell(i int, s string) cell {
+	return coloredCell(s, colorize(runColor(i), s))
+}
+
 // writeTable prints rows padded to align columns, using each cell's visible
 // text to compute widths so ANSI-colorized cells never throw off alignment.
 func writeTable(w io.Writer, rows [][]cell) {

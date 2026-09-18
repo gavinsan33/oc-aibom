@@ -684,7 +684,7 @@ func printCompare(items []aibom.AIBOM) {
 		cells := make([]cell, len(items)+1)
 		cells[0] = labelCell(label)
 		for i, a := range items {
-			cells[i+1] = plainCell(values(a))
+			cells[i+1] = runCell(i, values(a))
 		}
 		rows = append(rows, cells)
 	}
@@ -696,7 +696,13 @@ func printCompare(items []aibom.AIBOM) {
 	writeTable(os.Stdout, rows)
 	fmt.Println()
 
-	rows = nil
+	fmt.Println(bold("Performance:"))
+	metricHeader := make([]cell, len(items)+1)
+	metricHeader[0] = labelHeaderCell("METRIC")
+	for i, a := range items {
+		metricHeader[i+1] = runHeaderCell(i, a.Name)
+	}
+	rows = [][]cell{metricHeader}
 	for _, m := range []struct {
 		label string
 		get   func(aibom.ResourceUtilization) float64
