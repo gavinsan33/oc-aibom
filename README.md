@@ -98,6 +98,15 @@ metric's min/avg/max/p95 and its first→middle→last-third breakdown across
 the run, with a trend arrow (↑/↓/→) flagging runs that ramped up, throttled
 down, or held steady — something a single run-wide average can't show.
 
+For an inference AIBOM whose serving engine has its own telemetry (vLLM
+today — see aibom-webhook-service's CLAUDE.md, "Inference Performance
+Telemetry"), an "Inference Performance" section shows vLLM's own
+serving-level metrics (TTFT, ITL, queue depth, KV-cache usage, throughput)
+with the same min/avg/max/p95/segments detail — a distinct section from
+resource utilization, since these describe the serving application's own
+behavior rather than the hardware underneath it. Absent on an AIBOM
+predating this field, or one whose serving engine isn't covered yet.
+
 A `Signature:` line reports whether the AIBOM's Ed25519 signature (see
 aibom-webhook-service's `CLAUDE.md`, "Compiled AIBOM Signing") checks out:
 

@@ -42,19 +42,24 @@ type AIBOM struct {
 
 // Data mirrors the fields compile_aibom() writes into spec.data.
 type Data struct {
-	ExperimentIntent      string              `json:"experiment_intent"`
-	ExperimentName        string              `json:"experiment_name"`
-	ExperimentDescription string              `json:"experiment_description"`
-	SourceCode            SourceCode          `json:"source_code"`
-	ExecutionMetadata     ExecutionMetadata   `json:"execution_metadata"`
-	Model                 Model               `json:"model"`
-	Dataset               Dataset             `json:"dataset"`
-	Training              *Training           `json:"training,omitempty"`
-	FineTuning            *FineTuning         `json:"fine_tuning,omitempty"`
-	Inference             *Inference          `json:"inference,omitempty"`
-	Environment           Environment         `json:"environment"`
-	ResourceUtilization   ResourceUtilization `json:"resource_utilization"`
-	Metadata              Metadata            `json:"_metadata"`
+	ExperimentIntent string `json:"experiment_intent"`
+	// ExperimentIntentDeclaredVia is "annotation" or "inferred_from_model_detection"
+	// (empty on an AIBOM predating this field, or when ExperimentIntent fell
+	// through to "unknown" with nothing to attribute it to) -- see
+	// aibom-webhook-service's CLAUDE.md, "Experiment Intent Detection".
+	ExperimentIntentDeclaredVia string              `json:"experiment_intent_declared_via"`
+	ExperimentName              string              `json:"experiment_name"`
+	ExperimentDescription       string              `json:"experiment_description"`
+	SourceCode                  SourceCode          `json:"source_code"`
+	ExecutionMetadata           ExecutionMetadata   `json:"execution_metadata"`
+	Model                       Model               `json:"model"`
+	Dataset                     Dataset             `json:"dataset"`
+	Training                    *Training           `json:"training,omitempty"`
+	FineTuning                  *FineTuning         `json:"fine_tuning,omitempty"`
+	Inference                   *Inference          `json:"inference,omitempty"`
+	Environment                 Environment         `json:"environment"`
+	ResourceUtilization         ResourceUtilization `json:"resource_utilization"`
+	Metadata                    Metadata            `json:"_metadata"`
 }
 
 type SourceCode struct {
@@ -202,6 +207,25 @@ type Inference struct {
 	TopP                 FlexFloat `json:"top_p"`
 	TopK                 FlexInt   `json:"top_k"`
 	MaxTokens            int       `json:"max_tokens"`
+	// Performance is nil on an AIBOM predating this field, or whenever the
+	// workload's serving_engine isn't one VLLM_TELEMETRY_QUERIES covers (only
+	// vLLM today) -- see aibom-webhook-service's CLAUDE.md, "Inference
+	// Performance Telemetry".
+	Performance *InferencePerformance `json:"performance,omitempty"`
+}
+
+// InferencePerformance is vLLM's own serving-level telemetry (TTFT, ITL,
+// queue depth, KV-cache usage, throughput) -- a separate top-level concern
+// from ResourceUtilization, which only covers hardware (GPU/CPU/network).
+// Deliberately the same Metrics map[string]MetricStats shape as
+// ResourceUtilization so the same min/max/avg/p95/segments rendering
+// applies to both, just keyed by a different metric-name set. Has no
+// GrafanaLinks or Note field: postprocess.py's inference.performance never
+// carries either.
+type InferencePerformance struct {
+	CollectedAt              string                 `json:"collected_at"`
+	SummaryIncludesColdStart bool                   `json:"summary_includes_cold_start"`
+	Metrics                  map[string]MetricStats `json:"metrics"`
 }
 
 // GPUCount, CPUCores, and NUMANodes use FlexInt: they're read straight from
