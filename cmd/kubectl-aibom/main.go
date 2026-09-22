@@ -530,9 +530,7 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, brief bool) {
 		fmt.Printf("  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
 		fmt.Printf("  Max Tokens:           %d\n", inf.MaxTokens)
 		if perf := inf.Performance; perf != nil && len(perf.Metrics) > 0 {
-			fmt.Println()
-			fmt.Println(bold("Inference Performance:"))
-			printMetricsSection(perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, nil, brief)
+			printMetricsSection("Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, nil, brief)
 		}
 	}
 
@@ -554,13 +552,13 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, brief bool) {
 		}
 	}
 
-	fmt.Println()
-	fmt.Println("Performance:")
 	ru := a.Data.ResourceUtilization
 	if ru.Note != "" {
+		fmt.Println()
+		fmt.Println(bold("Hardware Performance:"))
 		fmt.Printf("  %s\n", ru.Note)
 	} else {
-		printMetricsSection(ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, ru.GrafanaLinks, brief)
+		printMetricsSection("Hardware Performance", ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, ru.GrafanaLinks, brief)
 	}
 
 	if !brief {
@@ -593,8 +591,6 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 	if len(metrics) == 0 {
 		return
 	}
-	fmt.Println()
-	fmt.Println(bold("Performance Detail:"))
 	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "LIMIT", "P95", "UNIT", "1ST -> MID -> LAST", "SHAPE")}
 	for _, key := range order {
 		m, ok := metrics[key]
@@ -620,18 +616,26 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 	writeTable(os.Stdout, rows)
 }
 
-// printMetricsSection prints a metrics summary (avg + unit per known key,
-// cold-start note, optional Grafana links, and -- unless brief -- the full
-// detail table) shared by ResourceUtilization and InferencePerformance's
-// identically-shaped map[string]MetricStats. grafanaLinks is nil for
-// InferencePerformance, which has no such field.
-func printMetricsSection(metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, grafanaLinks []string, brief bool) {
-	for _, key := range order {
-		m, ok := metrics[key]
-		if !ok {
-			continue
+// printMetricsSection prints one metrics section -- shared by
+// ResourceUtilization ("Hardware Performance") and InferencePerformance's
+// ("Inference Performance") identically-shaped map[string]MetricStats.
+// grafanaLinks is nil for InferencePerformance, which has no such field.
+//
+// In brief mode it prints only the per-metric average (the full detail
+// table is skipped, so the average is the only view of each metric). In
+// full mode the average-only line is redundant with the detail table's AVG
+// column, so it's omitted there and the detail table is printed instead.
+func printMetricsSection(title string, metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, grafanaLinks []string, brief bool) {
+	fmt.Println()
+	fmt.Println(bold(title + ":"))
+	if brief {
+		for _, key := range order {
+			m, ok := metrics[key]
+			if !ok {
+				continue
+			}
+			fmt.Printf("  %-16s %.2f %s\n", labels[key]+":", m.Avg, m.Unit)
 		}
-		fmt.Printf("  %-16s %.2f %s\n", labels[key]+":", m.Avg, m.Unit)
 	}
 	if includesColdStart {
 		fmt.Println("  (includes cold start)")
