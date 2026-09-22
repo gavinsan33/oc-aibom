@@ -268,6 +268,26 @@ var telemetryMetricLabels = map[string]string{
 	"network_transmit":         "Network TX",
 }
 
+// vllmMetricOrder and vllmMetricLabels are inference.performance's analog of
+// telemetryMetricOrder/telemetryMetricLabels above -- vLLM's own
+// serving-level metrics (aibom-webhook-service's VLLM_TELEMETRY_QUERIES),
+// not DCGM/cAdvisor hardware metrics.
+var vllmMetricOrder = []string{
+	"time_to_first_token_seconds", "inter_token_latency_seconds",
+	"num_requests_running", "num_requests_waiting",
+	"kv_cache_usage", "prompt_throughput", "generation_throughput",
+}
+
+var vllmMetricLabels = map[string]string{
+	"time_to_first_token_seconds": "TTFT",
+	"inter_token_latency_seconds": "ITL",
+	"num_requests_running":        "Requests Running",
+	"num_requests_waiting":        "Requests Waiting",
+	"kv_cache_usage":              "KV Cache Usage",
+	"prompt_throughput":           "Prompt Throughput",
+	"generation_throughput":       "Gen Throughput",
+}
+
 // colorizeShape wraps each arrow rune in a Sparkline() shape with its own
 // direction's color (green for ↗, red for ↘, yellow for →), rather than one
 // color for the whole string based on the metric's overall Trend(). A mixed
@@ -438,7 +458,11 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, brief bool) {
 	if a.Data.ExperimentDescription != "" {
 		fmt.Printf("Description:       %s\n", a.Data.ExperimentDescription)
 	}
-	fmt.Printf("Experiment Intent: %s\n", a.ExperimentIntent)
+	if via := a.Data.ExperimentIntentDeclaredVia; via != "" {
+		fmt.Printf("Experiment Intent: %s (via: %s)\n", a.ExperimentIntent, via)
+	} else {
+		fmt.Printf("Experiment Intent: %s\n", a.ExperimentIntent)
+	}
 	fmt.Printf("Runtime:           %s (%s -> %s)\n",
 		a.Data.ExecutionMetadata.Duration(),
 		a.Data.ExecutionMetadata.EarliestPodStart(),
@@ -505,6 +529,11 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, brief bool) {
 		fmt.Printf("  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
 		fmt.Printf("  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
 		fmt.Printf("  Max Tokens:           %d\n", inf.MaxTokens)
+		if perf := inf.Performance; perf != nil && len(perf.Metrics) > 0 {
+			fmt.Println()
+			fmt.Println(bold("Inference Performance:"))
+			printMetricsSection(perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, nil, brief)
+		}
 	}
 
 	fmt.Println()
@@ -531,22 +560,7 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, brief bool) {
 	if ru.Note != "" {
 		fmt.Printf("  %s\n", ru.Note)
 	} else {
-		for _, key := range telemetryMetricOrder {
-			m, ok := ru.Metrics[key]
-			if !ok {
-				continue
-			}
-			fmt.Printf("  %-16s %.2f %s\n", telemetryMetricLabels[key]+":", m.Avg, m.Unit)
-		}
-		if ru.SummaryIncludesColdStart {
-			fmt.Println("  (includes cold start)")
-		}
-		for _, link := range ru.GrafanaLinks {
-			fmt.Printf("  Grafana:         %s\n", link)
-		}
-		if !brief {
-			printMetricDetail(ru)
-		}
+		printMetricsSection(ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, ru.GrafanaLinks, brief)
 	}
 
 	if !brief {
@@ -565,21 +579,25 @@ func boolStr(b bool) string {
 }
 
 // printMetricDetail prints the min/max/p95 and within-run shape for each
-// metric in ru.Metrics -- detail a flat average can't show, e.g. whether GPU
+// metric in metrics -- detail a flat average can't show, e.g. whether GPU
 // utilization held steady or throttled down partway through the run. Silent
-// no-op if the AIBOM predates this field (an older postprocess.py). Rendered
-// as a table (not manually padded Printf columns) since the values span
-// wildly different magnitudes across metrics (e.g. "28.00" vs "20500.00"),
-// which fixed-width padding can't keep aligned.
-func printMetricDetail(ru aibom.ResourceUtilization) {
-	if len(ru.Metrics) == 0 {
+// no-op if metrics is empty (an AIBOM predating the field, or an inference
+// AIBOM with no vLLM telemetry). Rendered as a table (not manually padded
+// Printf columns) since the values span wildly different magnitudes across
+// metrics (e.g. "28.00" vs "20500.00"), which fixed-width padding can't keep
+// aligned. Generic over order/labels so both ResourceUtilization (hardware
+// metrics) and InferencePerformance (vLLM's own serving metrics) share this
+// rendering despite having different known metric-name sets -- see
+// telemetryMetricOrder/telemetryMetricLabels vs. vllmMetricOrder/vllmMetricLabels.
+func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, labels map[string]string) {
+	if len(metrics) == 0 {
 		return
 	}
 	fmt.Println()
 	fmt.Println(bold("Performance Detail:"))
 	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "LIMIT", "P95", "UNIT", "1ST -> MID -> LAST", "SHAPE")}
-	for _, key := range telemetryMetricOrder {
-		m, ok := ru.Metrics[key]
+	for _, key := range order {
+		m, ok := metrics[key]
 		if !ok {
 			continue
 		}
@@ -588,7 +606,7 @@ func printMetricDetail(ru aibom.ResourceUtilization) {
 			formatSegment(m.Segments.FirstThird), formatSegment(m.Segments.MiddleThird), formatSegment(m.Segments.LastThird),
 		)
 		rows = append(rows, []cell{
-			labelCell(telemetryMetricLabels[key]),
+			labelCell(labels[key]),
 			plainCell(formatMetric(m.Min)),
 			plainCell(formatMetric(m.Avg)),
 			maxCell(m.Max, m.Limit),
@@ -600,6 +618,30 @@ func printMetricDetail(ru aibom.ResourceUtilization) {
 		})
 	}
 	writeTable(os.Stdout, rows)
+}
+
+// printMetricsSection prints a metrics summary (avg + unit per known key,
+// cold-start note, optional Grafana links, and -- unless brief -- the full
+// detail table) shared by ResourceUtilization and InferencePerformance's
+// identically-shaped map[string]MetricStats. grafanaLinks is nil for
+// InferencePerformance, which has no such field.
+func printMetricsSection(metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, grafanaLinks []string, brief bool) {
+	for _, key := range order {
+		m, ok := metrics[key]
+		if !ok {
+			continue
+		}
+		fmt.Printf("  %-16s %.2f %s\n", labels[key]+":", m.Avg, m.Unit)
+	}
+	if includesColdStart {
+		fmt.Println("  (includes cold start)")
+	}
+	for _, link := range grafanaLinks {
+		fmt.Printf("  Grafana:         %s\n", link)
+	}
+	if !brief {
+		printMetricDetail(metrics, order, labels)
+	}
 }
 
 // limitCell renders a metric's configured resource limit, or "-" for a
