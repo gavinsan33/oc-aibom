@@ -127,6 +127,26 @@ aibom-webhook-service's `CLAUDE.md`, "Compiled AIBOM Signing") checks out:
 - **`✗ INVALID SIGNATURE`** (red) — the signature does not match the data.
   This is the tamper/corruption case.
 
+When the AIBOM has a persisted telemetry time series (its signed data carries
+a `telemetry_series_ref` pointing at an `AIBOMTelemetry` object — see
+aibom-webhook-service's `CLAUDE.md`, "Telemetry Time Series"), a
+`Telemetry Series:` line reports whether that object's `spec.seriesJson`
+still hashes to the sha256 recorded in the signed data. AIBOMs without a
+stored series print no such line.
+
+- **`✓ Verified`** (green) — the content matches the digest, *and* the AIBOM's
+  own signature is `✓ Verified`, so the digest itself is authenticated.
+- **`digest matches (AIBOM not verified)`** (yellow) — the content matches, but
+  the AIBOM's signature isn't verified (unsigned, unconfirmed, ...). The digest
+  lives inside the AIBOM's data, so this only shows the series wasn't changed
+  independently of the AIBOM, not that either is genuine.
+- **`✗ DIGEST MISMATCH`** (red) — the object's content (or size) no longer
+  matches the signed digest: it was altered or replaced after the fact.
+- **`missing`** (yellow) — the referenced object no longer exists.
+- **`unconfirmed`** (yellow) — it couldn't be checked (no RBAC to read
+  `aibomtelemetries`, no cluster, or a reference shape this version doesn't
+  understand, such as the short-lived ConfigMap form).
+
 ### `oc aibom diff <name-a> <name-b>`
 
 Field-by-field comparison of two AIBOMs: model config, dataset

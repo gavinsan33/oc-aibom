@@ -125,7 +125,7 @@ func main() {
 				return err
 			}
 			verifyResult := aibom.Verify(ctx, client, a)
-			printDescribe(a, verifyResult, brief)
+			printDescribe(a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief)
 			return nil
 		},
 	}
@@ -448,7 +448,29 @@ func formatVerify(r aibom.VerifyResult) string {
 	}
 }
 
-func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, brief bool) {
+// formatSeriesVerify renders a VerifySeries result with the same color rules
+// as formatVerify: green only when the series is authenticated end to end,
+// red for a confirmed digest mismatch, yellow for anything a human should
+// look at. Callers skip SeriesAbsent (an AIBOM without a stored series isn't
+// worth a line).
+func formatSeriesVerify(r aibom.SeriesResult) string {
+	switch r.Status {
+	case aibom.SeriesVerified:
+		return green("✓ Verified") + " (matches the digest in the AIBOM's verified signed data)"
+	case aibom.SeriesDigestOnly:
+		return yellow("digest matches (AIBOM not verified)") + " — " + r.Detail
+	case aibom.SeriesMismatch:
+		return red("✗ DIGEST MISMATCH") + " — " + r.Detail
+	case aibom.SeriesMissing:
+		return yellow("missing") + " — " + r.Detail
+	case aibom.SeriesUnconfirmed:
+		return yellow("unconfirmed") + " — " + r.Detail
+	default:
+		return r.Detail
+	}
+}
+
+func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief bool) {
 	fmt.Printf("Name:              %s\n", a.Name)
 	fmt.Printf("Namespace:         %s\n", a.Namespace)
 	fmt.Printf("Job:               %s\n", a.JobName)
@@ -470,6 +492,9 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, brief bool) {
 	)
 	fmt.Printf("Status:            %s\n", formatPodStatus(a.Data.ExecutionMetadata.Status, nil))
 	fmt.Printf("Signature:         %s\n", formatVerify(verifyResult))
+	if seriesResult.Status != aibom.SeriesAbsent {
+		fmt.Printf("Telemetry Series:  %s\n", formatSeriesVerify(seriesResult))
+	}
 	fmt.Println()
 	fmt.Println(bold("Model:"))
 	fmt.Printf("  Name:          %s\n", a.Data.Model.Name)
