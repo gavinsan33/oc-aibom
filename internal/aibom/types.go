@@ -149,8 +149,6 @@ type Model struct {
 	Quantization        string               `json:"quantization"`
 	QuantizationBits    int                  `json:"quantization_bits"`
 	Dtype               string               `json:"dtype"`
-	Revision            string               `json:"revision,omitempty"`
-	NameDeclaredVia     string               `json:"name_declared_via,omitempty"`
 	SpeculativeDecoding *SpeculativeDecoding `json:"speculative_decoding,omitempty"`
 
 	// Populated only when the webhook could read the model's own files

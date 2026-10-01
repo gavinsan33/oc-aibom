@@ -112,7 +112,6 @@ func Diff(a, b AIBOM) []FieldDiff {
 
 	add("model.name", a.Data.Model.Name, b.Data.Model.Name)
 	add("model.version", a.Data.Model.Version, b.Data.Model.Version)
-	add("model.revision", a.Data.Model.Revision, b.Data.Model.Revision)
 	add("model.architecture", a.Data.Model.Architecture, b.Data.Model.Architecture)
 	add("model.framework", a.Data.Model.Framework, b.Data.Model.Framework)
 	add("model.quantization", a.Data.Model.Quantization, b.Data.Model.Quantization)
