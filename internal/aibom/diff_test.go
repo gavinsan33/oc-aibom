@@ -39,6 +39,18 @@ func TestDiffModelVersion(t *testing.T) {
 	}
 }
 
+func TestDiffModelRevision(t *testing.T) {
+	a := AIBOM{Data: Data{Model: Model{Name: "Qwen/Qwen2.5-32B-Instruct", Revision: "5ede1c97"}}}
+	b := AIBOM{Data: Data{Model: Model{Name: "Qwen/Qwen2.5-32B-Instruct", Revision: "a1b2c3d4"}}}
+	d, ok := findDiff(Diff(a, b), "model.revision")
+	if !ok {
+		t.Fatal("expected model.revision diff for same-name model at a different revision")
+	}
+	if d.A != "5ede1c97" || d.B != "a1b2c3d4" {
+		t.Fatalf("unexpected diff values: %+v", d)
+	}
+}
+
 func TestDiffDatasetDrift(t *testing.T) {
 	a := AIBOM{Data: Data{
 		Dataset: Dataset{AutoDetected: []AutoDetectedDataset{{MatchesDeclared: true}}},
