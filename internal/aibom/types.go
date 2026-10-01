@@ -152,6 +152,14 @@ type Model struct {
 	Revision            string               `json:"revision,omitempty"`
 	NameDeclaredVia     string               `json:"name_declared_via,omitempty"`
 	SpeculativeDecoding *SpeculativeDecoding `json:"speculative_decoding,omitempty"`
+
+	// Populated only when the webhook could read the model's own files
+	// (a pre-pulled pvc:// model), see aibom-webhook-service's
+	// detect_model_from_storage. Identification, not verification.
+	NameDeclaredVia string `json:"name_declared_via,omitempty"`
+	Revision        string `json:"revision,omitempty"`
+	BaseModel       string `json:"base_model,omitempty"`
+	SizeBytes       int64  `json:"size_bytes,omitempty"`
 }
 
 type DeclaredDataset struct {
