@@ -498,6 +498,12 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 	fmt.Println()
 	fmt.Println(bold("Model:"))
 	fmt.Printf("  Name:          %s\n", a.Data.Model.Name)
+	if v := a.Data.Model.NameDeclaredVia; v != "" {
+		fmt.Printf("  Name Source:   %s\n", v)
+	}
+	if v := a.Data.Model.Revision; v != "" {
+		fmt.Printf("  Revision:      %s\n", v)
+	}
 	fmt.Printf("  Version:       %s\n", a.Data.Model.Version)
 	fmt.Printf("  Architecture:  %s\n", a.Data.Model.Architecture)
 	fmt.Printf("  Framework:     %s\n", a.Data.Model.Framework)

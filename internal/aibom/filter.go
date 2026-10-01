@@ -20,7 +20,7 @@ type Filter struct {
 }
 
 func (f Filter) Match(a AIBOM) bool {
-	if f.Model != "" && !strings.EqualFold(a.Data.Model.Name, f.Model) {
+	if f.Model != "" && !modelNameMatches(a.Data.Model.Name, f.Model) {
 		return false
 	}
 	if f.Intent != "" && !strings.EqualFold(a.ExperimentIntent, f.Intent) {
@@ -84,4 +84,20 @@ func DriftOnly(items []AIBOM) []AIBOM {
 		}
 	}
 	return out
+}
+
+// modelNameMatches compares a model name to a --model filter. A name may be a
+// Hugging Face repo id ("org/model"); a filter without an org also matches
+// its final segment, so "granite-3.3-2b-instruct" still finds
+// "ibm-granite/granite-3.3-2b-instruct".
+func modelNameMatches(name, want string) bool {
+	if strings.EqualFold(name, want) {
+		return true
+	}
+	if !strings.Contains(want, "/") {
+		if i := strings.LastIndex(name, "/"); i >= 0 {
+			return strings.EqualFold(name[i+1:], want)
+		}
+	}
+	return false
 }

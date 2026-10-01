@@ -155,3 +155,20 @@ func TestDriftOnly(t *testing.T) {
 		t.Fatalf("expected only run-b to have drift, got %+v", items)
 	}
 }
+
+func TestModelNameMatches(t *testing.T) {
+	cases := []struct {
+		name, want string
+		ok         bool
+	}{
+		{"ibm-granite/granite-3.3-2b-instruct", "granite-3.3-2b-instruct", true},
+		{"ibm-granite/granite-3.3-2b-instruct", "IBM-Granite/Granite-3.3-2b-Instruct", true},
+		{"ibm-granite/granite-3.3-2b-instruct", "other-org/granite-3.3-2b-instruct", false},
+		{"granite-3.3-2b-instruct", "granite", false},
+	}
+	for _, c := range cases {
+		if got := modelNameMatches(c.name, c.want); got != c.ok {
+			t.Errorf("modelNameMatches(%q, %q) = %v, want %v", c.name, c.want, got, c.ok)
+		}
+	}
+}
