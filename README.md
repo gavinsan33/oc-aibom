@@ -107,6 +107,13 @@ resource utilization, since these describe the serving application's own
 behavior rather than the hardware underneath it. Absent on an AIBOM
 predating this field, or one whose serving engine isn't covered yet.
 
+For a KServe model pre-pulled onto a PVC, the Model section also shows how
+the name was determined (`via: model_files_readme` means it came from the
+model's own README rather than the PVC folder name), plus the pinned
+`Revision`, `Base Model`, and `Size` read from the model's files. This is
+identification, not verification: nothing checks the files against the
+weights. `diff` flags a changed `model.revision`.
+
 A `Signature:` line reports whether the AIBOM's Ed25519 signature (see
 aibom-webhook-service's `CLAUDE.md`, "Compiled AIBOM Signing") checks out:
 
