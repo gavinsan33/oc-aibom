@@ -1,7 +1,7 @@
 # oc-aibom
 
 A `kubectl`/`oc` plugin that makes it easier to filter through and compare
-[AIBOM](https://github.com/gsanders/aibom-webhook-service) (`aibom.io/v1alpha1`)
+[AIBOM](https://github.com/gavinsan33/aibom-webhook-service) (`aibom.io/v1alpha1`)
 custom resources than raw `oc get aibom -o yaml`, using only the standard
 Kubernetes API.
 
