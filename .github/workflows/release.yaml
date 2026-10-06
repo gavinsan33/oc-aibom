@@ -42,8 +42,8 @@ jobs:
           set -euo pipefail
           git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
-          git fetch origin master
-          git checkout master
+          git fetch origin main
+          git checkout main
 
           OLD_VERSION=$(grep -m1 '^  version:' plugins/aibom.yaml | awk '{print $2}')
           NEW_VERSION="${{ github.ref_name }}"
@@ -59,4 +59,4 @@ jobs:
 
           git add plugins/aibom.yaml
           git diff --cached --quiet || git commit -m "Point krew manifest at ${NEW_VERSION}"
-          git push origin master
+          git push origin main
