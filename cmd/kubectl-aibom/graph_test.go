@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"math"
 	"os"
 	"strings"
@@ -96,5 +98,30 @@ func TestGraphModelView(t *testing.T) {
 	}
 	if strings.Contains(m.View(), "GPU Utilization\n") {
 		t.Fatal("zoomed view should show only the selected metric")
+	}
+}
+
+func TestGraphModelOverlapAndHide(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.ANSI)
+	defer lipgloss.SetColorProfile(termenv.Ascii)
+
+	// Two identical runs: every dot coincides, so the plot is all overlap color.
+	r := tuiRuns()[0]
+	runs := []graphRun{{"a", r.Series}, {"b", r.Series}}
+	keys, _ := graphMetricKeys(runs, nil)
+	var m tea.Model = newGraphModel(runs, keys, false)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
+	box := func() string { // just the first chart panel, so legend/footer colors don't count
+		v := m.View()
+		return v[strings.Index(v, "╭"):strings.Index(v, "╯")]
+	}
+	if out := box(); !strings.Contains(out, "\x1b[97m") || strings.Contains(out, "\x1b[34m") || strings.Contains(out, "\x1b[35m") {
+		t.Fatalf("expected only overlap color on coincident lines")
+	}
+
+	// Hiding run 1 leaves only run 2's own color.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	if out := box(); !strings.Contains(out, "\x1b[35m") || strings.Contains(out, "\x1b[97m") {
+		t.Fatalf("expected run 2's color and no overlap color after hiding run 1")
 	}
 }
