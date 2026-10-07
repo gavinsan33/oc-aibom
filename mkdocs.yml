@@ -1,6 +1,6 @@
 # Standalone config, for previewing and checking these docs on their own.
 # The combined site (with the webhook and console plugin) is built from
-# gavinsan33/aibom-monorepo, which includes this file; its theme and
+# gavinsan33/project-aibom, which includes this file; its theme and
 # markdown extensions apply there, so keep this one minimal.
 site_name: oc-aibom
 repo_url: https://github.com/gavinsan33/oc-aibom
