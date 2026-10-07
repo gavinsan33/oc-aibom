@@ -165,6 +165,8 @@ every given run overlaid in its own color. Like the console plugin's compare
 telemetry tab, x is elapsed time since each run's own start on a shared axis
 (a shorter run is a shorter line) and the y scale is shared across runs.
 
+![Two runs compared across GPU, CPU, memory and network panels](docs/img/graph-grid-overview.png)
+
 | Key | Action |
 | --- | --- |
 | `←` `→` `↑` `↓` / `hjkl` / `tab` | select a metric |

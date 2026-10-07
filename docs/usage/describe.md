@@ -42,7 +42,7 @@ A `Signature:` line reports whether the AIBOM's Ed25519 signature checks out:
 
 ## Telemetry series
 
-When the AIBOM has a persisted telemetry time series, a `Telemetry Series:` line reports whether that object's `spec.seriesJson` still hashes to the sha256 recorded in the signed data. AIBOMs without a stored series print no such line.
+When the AIBOM has a persisted telemetry time series, a `Telemetry Series:` line reports whether that object's `spec.seriesJson` still hashes to the sha256 recorded in the signed data. AIBOMs without a stored series print no such line. To chart the series, see [graph](graph.md).
 
 | Status | Meaning |
 |--------|---------|
