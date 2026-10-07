@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	tea "github.com/charmbracelet/bubbletea"
+	"math"
+	"os"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -52,5 +55,46 @@ func TestPrintGraph(t *testing.T) {
 	}
 	if err := printGraph(&buf, runs, []string{"nope"}, false, 40); err == nil {
 		t.Fatal("expected unknown-metric error")
+	}
+}
+
+func tuiRuns() []graphRun {
+	mk := func(dur int64, amp float64) aibom.Series {
+		var s aibom.Series
+		s.Window.Start, s.Window.End = 1000, 1000+dur
+		var pts [][2]float64
+		for i := 0; i < 60; i++ {
+			pts = append(pts, [2]float64{float64(1000 + int64(i)*dur/60), amp * (0.5 + 0.5*math.Sin(float64(i)/6))})
+		}
+		s.Metrics = map[string]aibom.SeriesMetric{
+			"gpu_utilization": {Unit: "percent", Aggregate: pts},
+			"gpu_power":       {Unit: "watts", Aggregate: pts},
+		}
+		return s
+	}
+	return []graphRun{{"run1", mk(3600, 90)}, {"run2", mk(1800, 60)}}
+}
+
+func TestGraphModelView(t *testing.T) {
+	runs := tuiRuns()
+	keys, _ := graphMetricKeys(runs, nil)
+	var m tea.Model = newGraphModel(runs, keys, false)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
+	out := m.View()
+	if os.Getenv("SHOW_TUI") != "" {
+		t.Log("\n" + out)
+	}
+	for _, want := range []string{"GPU Utilization", "GPU Power", "run1", "run2", "1h00m", "avg"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("view missing %q", want)
+		}
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if got := m.(graphModel); got.sel != 1 || !got.zoom {
+		t.Fatalf("sel %d zoom %v", got.sel, got.zoom)
+	}
+	if strings.Contains(m.View(), "GPU Utilization\n") {
+		t.Fatal("zoomed view should show only the selected metric")
 	}
 }

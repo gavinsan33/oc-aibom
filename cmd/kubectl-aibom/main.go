@@ -183,6 +183,7 @@ func main() {
 	var graphMetrics []string
 	var graphPods bool
 	var graphWidth int
+	var graphText bool
 	graphCmd := &cobra.Command{
 		Use:               "graph <name> [<name>...]",
 		Short:             "Chart AIBOMs' stored telemetry time series in the terminal, overlaid for comparison",
@@ -219,6 +220,18 @@ func main() {
 				printNotes()
 				return fmt.Errorf("no usable stored telemetry for the given AIBOMs")
 			}
+			// Interactive full-screen view on a terminal; plain sparklines when
+			// piped or with --text. Notes go after the TUI so they survive the
+			// alternate screen.
+			if !graphText && term.IsTerminal(int(os.Stdout.Fd())) {
+				keys, err := graphMetricKeys(runs, graphMetrics)
+				if err != nil {
+					return err
+				}
+				err = runGraphTUI(runs, keys, graphPods)
+				printNotes()
+				return err
+			}
 			printNotes()
 			width := graphWidth
 			if width <= 0 {
@@ -232,7 +245,8 @@ func main() {
 	}
 	graphCmd.Flags().StringSliceVar(&graphMetrics, "metric", nil, "only graph these metric keys (e.g. gpu_utilization,memory_usage); default all")
 	graphCmd.Flags().BoolVar(&graphPods, "pods", false, "draw each run's pod/GPU/container lines instead of its aggregate")
-	graphCmd.Flags().IntVar(&graphWidth, "width", 0, "graph width in columns (default: terminal width)")
+	graphCmd.Flags().BoolVar(&graphText, "text", false, "print sparklines instead of opening the interactive full-screen view (automatic when stdout isn't a terminal)")
+	graphCmd.Flags().IntVar(&graphWidth, "width", 0, "text-mode graph width in columns (default: terminal width)")
 
 	root.AddCommand(listCmd, getCmd, diffCmd, compareCmd, graphCmd)
 
