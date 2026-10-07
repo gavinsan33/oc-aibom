@@ -47,9 +47,9 @@ func (m graphModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		step := 0
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "ctrl+c":
 			return m, tea.Quit
-		case "esc":
+		case "q", "esc": // back out of a zoom first, then quit
 			if !m.zoom {
 				return m, tea.Quit
 			}
@@ -309,7 +309,11 @@ func (m graphModel) View() string {
 	header := lipgloss.NewStyle().Bold(true).Render("oc aibom graph") + "  " + strings.Join(legend, "  ") +
 		lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("   0 → %s elapsed", fmtElapsed(m.sharedMax)))
 	stats := m.statsLines()
-	help := lipgloss.NewStyle().Faint(true).Render(" ←↑↓→ select · enter zoom · p per-pod/GPU · 1-9 hide/show run · q quit")
+	helpText := " ←↑↓→ select · enter zoom · p per-pod/GPU · 1-9 hide/show run · q quit"
+	if m.zoom {
+		helpText = " ←↑↓→ select · enter/q back · p per-pod/GPU · 1-9 hide/show run · ctrl+c quit"
+	}
+	help := lipgloss.NewStyle().Faint(true).Render(helpText)
 	footer := strings.Join(append(stats, help), "\n")
 	bodyH := m.h - 1 - len(stats) - 1
 	if bodyH < 6 {

@@ -168,10 +168,10 @@ telemetry tab, x is elapsed time since each run's own start on a shared axis
 | Key | Action |
 | --- | --- |
 | `←` `→` `↑` `↓` / `hjkl` / `tab` | select a metric |
-| `enter` / `z` | zoom the selected metric full screen (`esc` to go back) |
+| `enter` / `z` | zoom the selected metric full screen (`enter`, `q` or `esc` to go back) |
 | `1`–`9` | hide / show that run (the y scale stays put) |
 | `p` | per-pod / GPU / container lines instead of each run's aggregate |
-| `q` / `esc` | quit |
+| `q` / `esc` | quit (when zoomed, go back first; `ctrl+c` always quits) |
 
 Where runs' lines coincide the cell is drawn white, since a terminal cell
 can only hold one color; hide runs with `1`–`9` to see each one on its own.

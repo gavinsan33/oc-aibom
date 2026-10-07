@@ -125,3 +125,22 @@ func TestGraphModelOverlapAndHide(t *testing.T) {
 		t.Fatalf("expected run 2's color and no overlap color after hiding run 1")
 	}
 }
+
+func TestGraphModelQuitBacksOutOfZoom(t *testing.T) {
+	runs := tuiRuns()
+	keys, _ := graphMetricKeys(runs, nil)
+	var m tea.Model = newGraphModel(runs, keys, false)
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	q := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")}
+	m, cmd := m.Update(q)
+	if cmd != nil || m.(graphModel).zoom {
+		t.Fatal("q while zoomed should only zoom out")
+	}
+	if _, cmd = m.Update(q); cmd == nil {
+		t.Fatal("q while not zoomed should quit")
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if _, cmd = m.Update(tea.KeyMsg{Type: tea.KeyCtrlC}); cmd == nil {
+		t.Fatal("ctrl+c should quit even when zoomed")
+	}
+}
