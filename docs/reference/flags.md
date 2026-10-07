@@ -2,7 +2,7 @@
 
 `oc-aibom` is built with `k8s.io/cli-runtime`'s `genericclioptions`, so it accepts the same connection flags `oc` and `kubectl` do: `--kubeconfig`, `--context`, `--namespace`/`-n`, `--server`, `--token`, and so on. No plugin-specific configuration is needed.
 
-For the filter and sort flags, see [list](../usage/list.md).
+For the filter and sort flags, see [list](../usage/list.md). For the chart flags, see [graph](../usage/graph.md#flags).
 
 ## Implementation notes
 

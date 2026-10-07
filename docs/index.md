@@ -12,5 +12,6 @@ Examples use `oc`, but `oc` is a superset of `kubectl` and both use the same plu
 | `oc aibom describe <name>` | Human-readable summary of one AIBOM, including signature status |
 | `oc aibom diff <name-a> <name-b>` | Field-by-field comparison of two AIBOMs |
 | `oc aibom compare <name> <name> [<name>...]` | Side-by-side performance table across runs |
+| `oc aibom graph <name> [<name>...]` | Interactive terminal charts of the stored telemetry time series, with runs overlaid |
 
 Start with [Install](install.md).

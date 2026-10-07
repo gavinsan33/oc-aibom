@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 
@@ -179,7 +180,75 @@ func main() {
 		},
 	}
 
-	root.AddCommand(listCmd, getCmd, diffCmd, compareCmd)
+	var graphMetrics []string
+	var graphPods bool
+	var graphWidth int
+	var graphText bool
+	graphCmd := &cobra.Command{
+		Use:               "graph <name> [<name>...]",
+		Short:             "Chart AIBOMs' stored telemetry time series in the terminal, overlaid for comparison",
+		Args:              cobra.MinimumNArgs(1),
+		ValidArgsFunction: completeAIBOMNames(configFlags, 0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, namespace, err := buildClient(configFlags)
+			if err != nil {
+				return err
+			}
+			ctx := context.Background()
+			var runs []graphRun
+			var notes []string
+			for _, name := range args {
+				a, err := aibom.Get(ctx, client, namespace, name)
+				if err != nil {
+					return err
+				}
+				sr := aibom.VerifySeries(ctx, client, a, aibom.Verify(ctx, client, a))
+				if sr.Status == aibom.SeriesMismatch {
+					notes = append(notes, fmt.Sprintf("%s: not charted, telemetry series %s", name, formatSeriesVerify(sr)))
+					continue
+				}
+				s, err := aibom.LoadSeries(ctx, client, a)
+				if err != nil {
+					notes = append(notes, fmt.Sprintf("%s: left out, %v", name, err))
+					continue
+				}
+				notes = append(notes, fmt.Sprintf("%s: telemetry series %s", name, formatSeriesVerify(sr)))
+				runs = append(runs, graphRun{Name: name, Series: s})
+			}
+			printNotes := func() { fmt.Fprintln(os.Stderr, strings.Join(notes, "\n")) }
+			if len(runs) == 0 {
+				printNotes()
+				return fmt.Errorf("no usable stored telemetry for the given AIBOMs")
+			}
+			// Interactive full-screen view on a terminal; plain sparklines when
+			// piped or with --text. Notes go after the TUI so they survive the
+			// alternate screen.
+			if !graphText && term.IsTerminal(int(os.Stdout.Fd())) {
+				keys, err := graphMetricKeys(runs, graphMetrics)
+				if err != nil {
+					return err
+				}
+				err = runGraphTUI(runs, keys, graphPods)
+				printNotes()
+				return err
+			}
+			printNotes()
+			width := graphWidth
+			if width <= 0 {
+				width = 80
+				if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 20 {
+					width = w - 2
+				}
+			}
+			return printGraph(os.Stdout, runs, graphMetrics, graphPods, width)
+		},
+	}
+	graphCmd.Flags().StringSliceVar(&graphMetrics, "metric", nil, "only graph these metric keys (e.g. gpu_utilization,memory_usage); default all")
+	graphCmd.Flags().BoolVar(&graphPods, "pods", false, "draw each run's pod/GPU/container lines instead of its aggregate")
+	graphCmd.Flags().BoolVar(&graphText, "text", false, "print sparklines instead of opening the interactive full-screen view (automatic when stdout isn't a terminal)")
+	graphCmd.Flags().IntVar(&graphWidth, "width", 0, "text-mode graph width in columns (default: terminal width)")
+
+	root.AddCommand(listCmd, getCmd, diffCmd, compareCmd, graphCmd)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

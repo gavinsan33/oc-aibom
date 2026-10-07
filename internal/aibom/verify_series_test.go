@@ -156,3 +156,17 @@ func TestVerifySeries_UnconfirmedForUnrecognizedOrIncompleteRefs(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadSeries(t *testing.T) {
+	client := newTestDynamicClient(newTelemetryObject("ml-a", "run-telemetry-ab12cd34", map[string]any{"seriesJson": testSeriesJSON}))
+	s, err := LoadSeries(context.Background(), client, aibomWithSeriesRef(goodRef()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Metrics["cpu_usage"].Aggregate[0][1]; got != 1.5 || s.Window.StepSeconds != 30 {
+		t.Fatalf("decoded wrong: %v step %d", got, s.Window.StepSeconds)
+	}
+	if _, err := LoadSeries(context.Background(), client, aibomWithSeriesRef(nil)); err == nil {
+		t.Fatal("expected error for AIBOM without a series ref")
+	}
+}

@@ -25,5 +25,6 @@ nav:
       - list: usage/list.md
       - describe: usage/describe.md
       - diff and compare: usage/diff-compare.md
+      - graph: usage/graph.md
   - Reference:
       - Flags: reference/flags.md
