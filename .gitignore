@@ -1,2 +1,5 @@
 /kubectl-aibom
 /dist/
+
+# mkdocs build output
+site/
