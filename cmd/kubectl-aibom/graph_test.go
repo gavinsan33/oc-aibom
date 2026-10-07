@@ -1,0 +1,56 @@
+package main
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+	"unicode/utf8"
+
+	"github.com/gsanders/oc-aibom/internal/aibom"
+)
+
+func TestSparkline(t *testing.T) {
+	pts := [][2]float64{{0, 0}, {1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}, {6, 6}, {7, 7}}
+	if got := sparkline(pts, 8, 0, 7); got != "▁▂▃▄▅▆▇█" {
+		t.Fatalf("ramp: %q", got)
+	}
+	if got := sparkline(pts, 2, 0, 7); got != "▂▆" { // cell averages 1.5 and 5.5
+		t.Fatalf("downsampled: %q", got)
+	}
+	if got := sparkline([][2]float64{{0, 5}, {1, 5}}, 4, 5, 5); got != "▅▅▅▅" {
+		t.Fatalf("flat/stretched: %q", got)
+	}
+	// Shared scale: a run peaking at 1 against a shared max of 8 stays low.
+	if got := sparkline([][2]float64{{0, 1}}, 1, 0, 8); got != "▁" {
+		t.Fatalf("shared scale: %q", got)
+	}
+}
+
+func TestPrintGraph(t *testing.T) {
+	mk := func(start, end int64, gib float64) aibom.Series {
+		var s aibom.Series
+		s.Window.Start, s.Window.End = start, end
+		s.Metrics = map[string]aibom.SeriesMetric{
+			"memory_usage": {Unit: "bytes", Aggregate: [][2]float64{{float64(start), gib * (1 << 30)}, {float64(end), gib * (1 << 30)}}},
+		}
+		return s
+	}
+	runs := []graphRun{{"short", mk(1000, 1060, 1)}, {"long", mk(5000, 5120, 2)}}
+	var buf bytes.Buffer
+	if err := printGraph(&buf, runs, nil, false, 40); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "2m0s") || !strings.Contains(out, "max 2.00 GiB") || !strings.Contains(out, "max 1.00 GiB") {
+		t.Fatalf("output: %s", out)
+	}
+	// short run is half the longest, so about half as many cells.
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "short ") && utf8.RuneCountInString(line) > 30 {
+			t.Fatalf("short run not scaled to shared axis: %q", line)
+		}
+	}
+	if err := printGraph(&buf, runs, []string{"nope"}, false, 40); err == nil {
+		t.Fatal("expected unknown-metric error")
+	}
+}
