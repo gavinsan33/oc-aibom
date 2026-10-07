@@ -154,6 +154,39 @@ stored series print no such line.
   `aibomtelemetries`, no cluster, or a reference shape this version doesn't
   understand, such as the short-lived ConfigMap form).
 
+### `oc aibom graph <name> [<name>...]`
+
+Charts AIBOMs' stored telemetry time series (the `AIBOMTelemetry` object each
+`telemetry_series_ref` points at — see aibom-webhook-service's `CLAUDE.md`,
+"Telemetry Time Series"), so it works after Prometheus's retention window has
+passed. On a terminal it opens a full-screen, btop-style view (alternate
+screen, like `less`): a grid of braille line charts, one per metric, with
+every given run overlaid in its own color. Like the console plugin's compare
+telemetry tab, x is elapsed time since each run's own start on a shared axis
+(a shorter run is a shorter line) and the y scale is shared across runs.
+
+| Key | Action |
+| --- | --- |
+| `←` `→` `↑` `↓` / `hjkl` / `tab` | select a metric |
+| `enter` / `z` | zoom the selected metric full screen (`esc` to go back) |
+| `p` | per-pod / GPU / container lines instead of each run's aggregate |
+| `q` / `esc` | quit |
+
+The footer shows the selected metric's min/avg/max per run (and per-bucket
+peak where recorded). Series that fail the digest check are left out, as are
+runs with no stored series; the verification result for each run is printed
+when you quit.
+
+When stdout isn't a terminal (or with `--text`) it prints one sparkline row
+per run per metric instead, which is handy in logs and pipes.
+
+```
+oc aibom graph my-run
+oc aibom graph run1 run2 run3 --metric gpu_utilization,memory_usage
+oc aibom graph run1 run2 --pods
+oc aibom graph run1 run2 --text --width 100
+```
+
 ### `oc aibom diff <name-a> <name-b>`
 
 Field-by-field comparison of two AIBOMs: model config, dataset
@@ -220,6 +253,6 @@ kubectl krew install --manifest=plugins/aibom.yaml --archive=dist/kubectl-aibom_
 ## Project structure
 
 ```
-cmd/kubectl-aibom/   CLI entrypoint (cobra commands, table/summary output)
+cmd/kubectl-aibom/   CLI entrypoint (cobra commands, table/summary output, graph TUI)
 internal/aibom/      AIBOM types, dynamic-client queries, filter/diff logic
 ```
