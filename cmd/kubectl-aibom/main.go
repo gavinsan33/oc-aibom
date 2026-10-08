@@ -131,7 +131,7 @@ func main() {
 		},
 	}
 	getCmd.Flags().BoolVarP(&brief, "brief", "b", false, "omit pod list, performance detail table, and AIBOM metadata")
-	getCmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "also show hardware details (CPU, network, storage, kernel config, limits, benchmarks)")
+	getCmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "also show hardware details (CPU, network, storage, kernel config, limits, benchmarks) and extra vLLM server flags")
 
 	diffCmd := &cobra.Command{
 		Use:               "diff <name-a> <name-b>",
@@ -637,7 +637,7 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 		fmt.Printf("  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
 		fmt.Printf("  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
 		fmt.Printf("  Max Tokens:           %d\n", inf.MaxTokens)
-		if inf.ServedModelName != "" {
+		if detailed && inf.ServedModelName != "" {
 			fmt.Printf("  Served Model Name:    %s\n", inf.ServedModelName)
 		}
 		for _, o := range []struct {
@@ -648,7 +648,7 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 			{"Trust Remote Code", inf.TrustRemoteCode}, {"Enforce Eager", inf.EnforceEager},
 			{"Prefix Caching", inf.EnablePrefixCaching},
 		} {
-			if o.v != nil {
+			if detailed && o.v != nil {
 				fmt.Printf("  %-21s %v\n", o.label+":", o.v)
 			}
 		}
