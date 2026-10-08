@@ -5,11 +5,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -111,7 +109,7 @@ func main() {
 	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx); defaults to 'age' (oldest AIBOM first)")
 	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first; for the default age sort, shows most recently collected first)")
 
-	var brief bool
+	var brief, detailed bool
 	getCmd := &cobra.Command{
 		Use:               "describe <name>",
 		Short:             "Print a human-readable summary of a single AIBOM",
@@ -128,11 +126,12 @@ func main() {
 				return err
 			}
 			verifyResult := aibom.Verify(ctx, client, a)
-			printDescribe(a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief)
+			printDescribe(a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief, detailed)
 			return nil
 		},
 	}
 	getCmd.Flags().BoolVarP(&brief, "brief", "b", false, "omit pod list, performance detail table, and AIBOM metadata")
+	getCmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "also show hardware details (CPU, network, storage, kernel config, limits, benchmarks)")
 
 	diffCmd := &cobra.Command{
 		Use:               "diff <name-a> <name-b>",
@@ -541,7 +540,7 @@ func formatSeriesVerify(r aibom.SeriesResult) string {
 	}
 }
 
-func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief bool) {
+func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief, detailed bool) {
 	fmt.Printf("Name:              %s\n", a.Name)
 	fmt.Printf("Namespace:         %s\n", a.Namespace)
 	fmt.Printf("Job:               %s\n", a.JobName)
@@ -666,8 +665,8 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 	fmt.Printf("  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
 	fmt.Printf("  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
 	fmt.Printf("  Kernel:        %s\n", a.Data.Environment.KernelVersion)
-	if !brief {
-		printEnvironmentDetails(a.Data.Environment)
+	if detailed {
+		printEnvironmentDetails(os.Stdout, a.Data.Environment)
 	}
 
 	if !brief {
@@ -696,41 +695,6 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 		fmt.Printf("  Generator:          %s\n", a.Data.Metadata.Generator)
 		fmt.Printf("  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
 		fmt.Printf("  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
-	}
-}
-
-// printEnvironmentDetails prints the optional discovery sections, one line
-// per section with sorted key=value pairs; nested values (benchmarks) are
-// rendered as JSON. Silent for an AIBOM predating them.
-func printEnvironmentDetails(e aibom.Environment) {
-	if len(e.GPUMemoryMB) > 0 {
-		fmt.Printf("  GPU Memory:    %v MiB\n", e.GPUMemoryMB)
-	}
-	for _, sec := range []struct {
-		label string
-		m     map[string]any
-	}{
-		{"CPU Details", e.CPU}, {"Network", e.Network}, {"Storage", e.Storage},
-		{"Kernel Config", e.KernelConfig}, {"Proc Limits", e.ProcessLimits}, {"Benchmarks", e.Benchmarks},
-	} {
-		if len(sec.m) == 0 {
-			continue
-		}
-		keys := make([]string, 0, len(sec.m))
-		for k := range sec.m {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		parts := make([]string, 0, len(keys))
-		for _, k := range keys {
-			v := fmt.Sprint(sec.m[k])
-			if _, nested := sec.m[k].(map[string]any); nested {
-				b, _ := json.Marshal(sec.m[k])
-				v = string(b)
-			}
-			parts = append(parts, k+"="+v)
-		}
-		fmt.Printf("  %-14s %s\n", sec.label+":", strings.Join(parts, " "))
 	}
 }
 
