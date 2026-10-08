@@ -5,9 +5,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -636,6 +638,21 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 		fmt.Printf("  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
 		fmt.Printf("  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
 		fmt.Printf("  Max Tokens:           %d\n", inf.MaxTokens)
+		if inf.ServedModelName != "" {
+			fmt.Printf("  Served Model Name:    %s\n", inf.ServedModelName)
+		}
+		for _, o := range []struct {
+			label string
+			v     any
+		}{
+			{"Max Num Seqs", inf.MaxNumSeqs}, {"Seed", inf.Seed}, {"Port", inf.Port},
+			{"Trust Remote Code", inf.TrustRemoteCode}, {"Enforce Eager", inf.EnforceEager},
+			{"Prefix Caching", inf.EnablePrefixCaching},
+		} {
+			if o.v != nil {
+				fmt.Printf("  %-21s %v\n", o.label+":", o.v)
+			}
+		}
 		if perf := inf.Performance; perf != nil && len(perf.Metrics) > 0 {
 			printMetricsSection("Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, nil, brief)
 		}
@@ -649,6 +666,9 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 	fmt.Printf("  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
 	fmt.Printf("  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
 	fmt.Printf("  Kernel:        %s\n", a.Data.Environment.KernelVersion)
+	if !brief {
+		printEnvironmentDetails(a.Data.Environment)
+	}
 
 	if !brief {
 		fmt.Println()
@@ -676,6 +696,41 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 		fmt.Printf("  Generator:          %s\n", a.Data.Metadata.Generator)
 		fmt.Printf("  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
 		fmt.Printf("  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
+	}
+}
+
+// printEnvironmentDetails prints the optional discovery sections, one line
+// per section with sorted key=value pairs; nested values (benchmarks) are
+// rendered as JSON. Silent for an AIBOM predating them.
+func printEnvironmentDetails(e aibom.Environment) {
+	if len(e.GPUMemoryMB) > 0 {
+		fmt.Printf("  GPU Memory:    %v MiB\n", e.GPUMemoryMB)
+	}
+	for _, sec := range []struct {
+		label string
+		m     map[string]any
+	}{
+		{"CPU Details", e.CPU}, {"Network", e.Network}, {"Storage", e.Storage},
+		{"Kernel Config", e.KernelConfig}, {"Proc Limits", e.ProcessLimits}, {"Benchmarks", e.Benchmarks},
+	} {
+		if len(sec.m) == 0 {
+			continue
+		}
+		keys := make([]string, 0, len(sec.m))
+		for k := range sec.m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			v := fmt.Sprint(sec.m[k])
+			if _, nested := sec.m[k].(map[string]any); nested {
+				b, _ := json.Marshal(sec.m[k])
+				v = string(b)
+			}
+			parts = append(parts, k+"="+v)
+		}
+		fmt.Printf("  %-14s %s\n", sec.label+":", strings.Join(parts, " "))
 	}
 }
 
