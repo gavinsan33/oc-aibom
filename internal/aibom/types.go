@@ -223,7 +223,6 @@ type Inference struct {
 	TrustRemoteCode     any    `json:"trust_remote_code,omitempty"`
 	EnforceEager        any    `json:"enforce_eager,omitempty"`
 	EnablePrefixCaching any    `json:"enable_prefix_caching,omitempty"`
-	Port                any    `json:"port,omitempty"`
 	// Performance is nil on an AIBOM predating this field, or whenever the
 	// workload's serving_engine isn't one VLLM_TELEMETRY_QUERIES covers (only
 	// vLLM today) -- see aibom-webhook-service's CLAUDE.md, "Inference
@@ -262,13 +261,11 @@ type Environment struct {
 	// Optional sections from the discovery snapshot (all absent on older
 	// AIBOMs). Values come straight from shell output, so they're loosely
 	// typed and only ever displayed.
-	GPUMemoryMB   []FlexInt      `json:"gpu_memory_mb,omitempty"`
-	CPU           map[string]any `json:"cpu,omitempty"`
-	Network       map[string]any `json:"network,omitempty"`
-	Storage       map[string]any `json:"storage,omitempty"`
-	KernelConfig  map[string]any `json:"kernel_config,omitempty"`
-	ProcessLimits map[string]any `json:"process_limits,omitempty"`
-	Benchmarks    map[string]any `json:"benchmarks,omitempty"`
+	GPUMemoryMB  []FlexInt      `json:"gpu_memory_mb,omitempty"`
+	CPU          map[string]any `json:"cpu,omitempty"`
+	Network      map[string]any `json:"network,omitempty"`
+	Storage      map[string]any `json:"storage,omitempty"`
+	KernelConfig map[string]any `json:"kernel_config,omitempty"`
 }
 
 type ResourceUtilization struct {
