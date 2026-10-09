@@ -109,7 +109,7 @@ func main() {
 	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx); defaults to 'age' (oldest AIBOM first)")
 	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first; for the default age sort, shows most recently collected first)")
 
-	var brief, detailed bool
+	var brief bool
 	getCmd := &cobra.Command{
 		Use:               "describe <name>",
 		Short:             "Print a human-readable summary of a single AIBOM",
@@ -126,12 +126,11 @@ func main() {
 				return err
 			}
 			verifyResult := aibom.Verify(ctx, client, a)
-			printDescribe(a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief, detailed)
+			printDescribe(a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief)
 			return nil
 		},
 	}
 	getCmd.Flags().BoolVarP(&brief, "brief", "b", false, "omit pod list, performance detail table, and AIBOM metadata")
-	getCmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "also show hardware details (CPU, network, storage, kernel config, limits, benchmarks) and extra vLLM server flags")
 
 	diffCmd := &cobra.Command{
 		Use:               "diff <name-a> <name-b>",
@@ -540,7 +539,7 @@ func formatSeriesVerify(r aibom.SeriesResult) string {
 	}
 }
 
-func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief, detailed bool) {
+func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief bool) {
 	fmt.Printf("Name:              %s\n", a.Name)
 	fmt.Printf("Namespace:         %s\n", a.Namespace)
 	fmt.Printf("Job:               %s\n", a.JobName)
@@ -637,18 +636,18 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 		fmt.Printf("  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
 		fmt.Printf("  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
 		fmt.Printf("  Max Tokens:           %d\n", inf.MaxTokens)
-		if detailed && inf.ServedModelName != "" {
+		if inf.ServedModelName != "" {
 			fmt.Printf("  Served Model Name:    %s\n", inf.ServedModelName)
 		}
 		for _, o := range []struct {
 			label string
 			v     any
 		}{
-			{"Max Num Seqs", inf.MaxNumSeqs}, {"Seed", inf.Seed}, {"Port", inf.Port},
+			{"Max Num Seqs", inf.MaxNumSeqs}, {"Seed", inf.Seed},
 			{"Trust Remote Code", inf.TrustRemoteCode}, {"Enforce Eager", inf.EnforceEager},
 			{"Prefix Caching", inf.EnablePrefixCaching},
 		} {
-			if detailed && o.v != nil {
+			if o.v != nil {
 				fmt.Printf("  %-21s %v\n", o.label+":", o.v)
 			}
 		}
@@ -665,8 +664,8 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 	fmt.Printf("  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
 	fmt.Printf("  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
 	fmt.Printf("  Kernel:        %s\n", a.Data.Environment.KernelVersion)
-	if detailed {
-		printEnvironmentDetails(os.Stdout, a.Data.Environment)
+	for _, l := range environmentExtras(a.Data.Environment) {
+		fmt.Printf("  %-14s %s\n", l[0]+":", l[1])
 	}
 
 	if !brief {
