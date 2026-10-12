@@ -357,31 +357,6 @@ var vllmMetricLabels = map[string]string{
 	"generation_throughput":       "Gen Throughput",
 }
 
-// colorizeShape wraps each arrow rune in a Sparkline() shape with its own
-// direction's color (green for ↗, red for ↘, yellow for →), rather than one
-// color for the whole string based on the metric's overall Trend(). A mixed
-// shape like "↘↗" (dip then recover) needs both colors -- painting the whole
-// thing one color (e.g. yellow for Trend()'s "volatile" verdict) would make
-// the same ↘ glyph appear red in one row (a metric classified "down") and
-// yellow in another (a metric classified "volatile"), which reads as
-// inconsistent even though both rows show a real decline at that point.
-func colorizeShape(shape string) string {
-	var b strings.Builder
-	for _, r := range shape {
-		switch r {
-		case '↗':
-			b.WriteString(green(string(r)))
-		case '↘':
-			b.WriteString(red(string(r)))
-		case '→':
-			b.WriteString(yellow(string(r)))
-		default:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
 func formatSegment(v *float64) string {
 	if v == nil {
 		return "-"
@@ -716,7 +691,7 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 	if len(metrics) == 0 {
 		return
 	}
-	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "LIMIT", "P95", "UNIT", "1ST -> MID -> LAST", "SHAPE")}
+	rows := [][]cell{headerRow("METRIC", "MIN", "AVG", "MAX", "LIMIT", "P95", "UNIT", "1ST -> MID -> LAST")}
 	for _, key := range order {
 		m, ok := metrics[key]
 		if !ok {
@@ -735,7 +710,6 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 			plainCell(formatMetric(m.P95)),
 			plainCell(m.Unit),
 			plainCell(segmentsText),
-			shapeCell(m.Segments.Sparkline()),
 		})
 	}
 	writeTable(os.Stdout, rows)
@@ -826,46 +800,13 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 		changeText := formatPctChange(m.PctChange)
 		rows = append(rows, []cell{
 			labelCell(m.Metric),
-			metricCellWithShape(m.A, m.ShapeA),
-			metricCellWithShape(m.B, m.ShapeB),
+			plainCell(formatMetric(m.A)),
+			plainCell(formatMetric(m.B)),
 			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
 			coloredCell(changeText, colorBySign(m.PctChange, changeText)),
 		})
 	}
 	writeTable(os.Stdout, rows)
-}
-
-// metricCellWithShape appends a within-run arrow sparkline (see
-// MetricSegments.Sparkline) to a metric value, when known -- e.g. "75.00 ↘↗"
-// flags that a run's own average dipped then recovered, a distinction the
-// cross-run delta/change columns can't make on their own.
-func metricCellWithShape(v float64, shape string) cell {
-	if shape == "" {
-		return plainCell(formatMetric(v))
-	}
-	return joinShapeCell(formatMetric(v), shape)
-}
-
-// shapeCell renders a bare arrow sparkline (see MetricSegments.Sparkline)
-// as its own cell, e.g. for printMetricDetail's SHAPE column.
-func shapeCell(shape string) cell {
-	if shape == "" {
-		return plainCell("")
-	}
-	return joinShapeCell("", shape)
-}
-
-// joinShapeCell joins text and shape with a space (or returns shape alone if
-// text is empty), colorizing each arrow in shape individually (see
-// colorizeShape). Built as a cell (not a plain string) so the color escape
-// codes don't get counted by writeTable's column-width calculation.
-func joinShapeCell(text, shape string) cell {
-	visible, rendered := shape, colorizeShape(shape)
-	if text != "" {
-		visible = text + " " + visible
-		rendered = text + " " + rendered
-	}
-	return coloredCell(visible, rendered)
 }
 
 func printCompare(items []aibom.AIBOM) {

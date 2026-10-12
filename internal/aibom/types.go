@@ -5,7 +5,6 @@
 package aibom
 
 import (
-	"math"
 	"time"
 )
 
@@ -292,82 +291,6 @@ type MetricSegments struct {
 	FirstThird  *float64 `json:"first_third"`
 	MiddleThird *float64 `json:"middle_third"`
 	LastThird   *float64 `json:"last_third"`
-}
-
-// segmentPctChange is (to-from)/from*100, with a from-is-zero fallback so a
-// move away from (or between) all-zero segments still has a sign instead of
-// dividing by zero.
-func segmentPctChange(from, to float64) float64 {
-	if from == 0 {
-		switch {
-		case to == 0:
-			return 0
-		case to > 0:
-			return 100
-		default:
-			return -100
-		}
-	}
-	return (to - from) / from * 100
-}
-
-// Trend summarizes the shape of a metric across a single run's first/middle/
-// last thirds -- something a run-wide average can't show. Returns "" when
-// there isn't enough segment data to say.
-func (s MetricSegments) Trend() string {
-	if s.FirstThird == nil || s.LastThird == nil {
-		return ""
-	}
-	first, last := *s.FirstThird, *s.LastThird
-
-	if s.MiddleThird != nil {
-		firstToMid := segmentPctChange(first, *s.MiddleThird)
-		midToLast := segmentPctChange(*s.MiddleThird, last)
-		// Dipped then recovered, or spiked then dropped back: first->mid and
-		// mid->last moved in opposite directions, each past the same 10%
-		// threshold used for up/down below. Comparing only first vs. last
-		// would call a 100->50->100 run "flat" even though it was anything
-		// but steady in between.
-		if firstToMid*midToLast < 0 && math.Abs(firstToMid) > 10 && math.Abs(midToLast) > 10 {
-			return "volatile"
-		}
-	}
-
-	switch pctChange := segmentPctChange(first, last); {
-	case pctChange > 10:
-		return "up"
-	case pctChange < -10:
-		return "down"
-	default:
-		return "flat"
-	}
-}
-
-// slopeSymbol renders a first->second transition as "↗" (rising), "↘"
-// (falling), or "→" (roughly flat), using the same 10% threshold Trend()
-// uses for up/down.
-func slopeSymbol(from, to float64) string {
-	switch pct := segmentPctChange(from, to); {
-	case pct > 10:
-		return "↗"
-	case pct < -10:
-		return "↘"
-	default:
-		return "→"
-	}
-}
-
-// Sparkline renders the run's first/middle/last-third shape as a compact
-// two-arrow string -- e.g. "↘↗" for a dip-then-recover, "↗↗" for a steady
-// climb, "→→" for flat. More visual than Trend()'s single up/down/flat/
-// volatile verdict, and it needs no separate "volatile" case: a mixed shape
-// just draws as a mixed arrow sequence. Returns "" unless all three thirds
-// are present.
-func (s MetricSegments) Sparkline() string {
-	if s.FirstThird == nil || s.MiddleThird == nil || s.LastThird == nil {
-		return ""
-	}
-	return slopeSymbol(*s.FirstThird, *s.MiddleThird) + slopeSymbol(*s.MiddleThird, *s.LastThird)
 }
 
 // MetricStats is the full min/max/avg/p95/segments breakdown of one

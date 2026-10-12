@@ -14,8 +14,6 @@ A field-by-field comparison of two AIBOMs covering:
 - hardware and driver environment
 - a quantified performance table (value, delta and percent change) across GPU utilization, memory and power, CPU and memory usage, and network throughput
 
-When segmented telemetry stats are available, each run's own value is annotated with its within-run trend arrow. That is separate from the delta and change columns, which only compare the two runs' averages against each other.
-
 ## compare
 
 ```sh
