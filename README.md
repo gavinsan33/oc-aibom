@@ -95,8 +95,8 @@ plus any Grafana links) — instead of a raw YAML dump. If the AIBOM was
 compiled with per-metric detail (aibom-webhook-service's segmented telemetry
 stats — see its `CLAUDE.md`), a "Performance Detail" section also shows each
 metric's min/avg/max/p95 and its first→middle→last-third breakdown across
-the run, with a trend arrow (↑/↓/→) flagging runs that ramped up, throttled
-down, or held steady — something a single run-wide average can't show.
+the run — something a single run-wide average can't show. Use
+`oc aibom graph` to see the full time series.
 
 For an inference AIBOM whose serving engine has its own telemetry (vLLM
 today — see aibom-webhook-service's CLAUDE.md, "Inference Performance
@@ -198,10 +198,7 @@ oc aibom graph run1 run2 --text --width 100
 Field-by-field comparison of two AIBOMs: model config, dataset
 declaration/drift, git provenance, and hardware/driver environment, plus a
 quantified performance table (value, delta, and percent change) across GPU
-utilization/memory/power, CPU/memory usage, and network throughput. When
-segmented telemetry stats are available, each run's own value is annotated
-with its within-run trend arrow — distinct from the delta/change columns,
-which only compare the two runs' averages against each other.
+utilization/memory/power, CPU/memory usage, and network throughput.
 
 ### `oc aibom compare <name> <name> [<name>...]`
 

@@ -14,7 +14,7 @@ Prints a human-readable summary of a single AIBOM instead of a raw YAML dump:
 
 ## Performance detail
 
-If the AIBOM was compiled with per-metric detail, a "Performance Detail" section shows each metric's min, avg, max and p95, and its first, middle and last-third breakdown across the run. A trend arrow (↑, ↓, →) flags runs that ramped up, throttled down, or held steady, which a single run-wide average can't show.
+If the AIBOM was compiled with per-metric detail, a "Performance Detail" section shows each metric's min, avg, max and p95, and its first, middle and last-third breakdown across the run. Use `oc aibom graph` to see the full time series.
 
 ## Inference performance
 
