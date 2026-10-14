@@ -234,9 +234,8 @@ type Inference struct {
 // from ResourceUtilization, which only covers hardware (GPU/CPU/network).
 // Deliberately the same Metrics map[string]MetricStats shape as
 // ResourceUtilization so the same min/max/avg/p95/segments rendering
-// applies to both, just keyed by a different metric-name set. Has no
-// GrafanaLinks or Note field: postprocess.py's inference.performance never
-// carries either.
+// applies to both, just keyed by a different metric-name set. Has no Note
+// field: postprocess.py's inference.performance never carries one.
 type InferencePerformance struct {
 	CollectedAt              string                 `json:"collected_at"`
 	SummaryIncludesColdStart bool                   `json:"summary_includes_cold_start"`
@@ -269,7 +268,6 @@ type Environment struct {
 
 type ResourceUtilization struct {
 	CollectedAt              string                 `json:"collected_at"`
-	GrafanaLinks             []string               `json:"grafana_links"`
 	SummaryIncludesColdStart bool                   `json:"summary_includes_cold_start"`
 	Note                     string                 `json:"note"`
 	Metrics                  map[string]MetricStats `json:"metrics"`
