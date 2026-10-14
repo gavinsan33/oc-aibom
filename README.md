@@ -90,8 +90,8 @@ corresponding column to the table.
 
 Prints a human-readable summary of a single AIBOM's model, dataset
 (declared vs. auto-detected, flagging mismatches), source provenance,
-environment, and resource utilization (GPU/CPU/memory/network averages,
-plus any Grafana links) — instead of a raw YAML dump. If the AIBOM was
+environment, and resource utilization (GPU/CPU/memory/network
+averages) — instead of a raw YAML dump. If the AIBOM was
 compiled with per-metric detail (aibom-webhook-service's segmented telemetry
 stats — see its `CLAUDE.md`), a "Performance Detail" section also shows each
 metric's min/avg/max/p95 and its first→middle→last-third breakdown across

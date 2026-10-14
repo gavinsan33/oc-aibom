@@ -627,7 +627,7 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 			}
 		}
 		if perf := inf.Performance; perf != nil && len(perf.Metrics) > 0 {
-			printMetricsSection("Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, nil, brief)
+			printMetricsSection("Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, brief)
 		}
 	}
 
@@ -658,7 +658,7 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 		fmt.Println(bold("Hardware Performance:"))
 		fmt.Printf("  %s\n", ru.Note)
 	} else {
-		printMetricsSection("Hardware Performance", ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, ru.GrafanaLinks, brief)
+		printMetricsSection("Hardware Performance", ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, brief)
 	}
 
 	if !brief {
@@ -718,13 +718,12 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 // printMetricsSection prints one metrics section -- shared by
 // ResourceUtilization ("Hardware Performance") and InferencePerformance's
 // ("Inference Performance") identically-shaped map[string]MetricStats.
-// grafanaLinks is nil for InferencePerformance, which has no such field.
 //
 // In brief mode it prints only the per-metric average (the full detail
 // table is skipped, so the average is the only view of each metric). In
 // full mode the average-only line is redundant with the detail table's AVG
 // column, so it's omitted there and the detail table is printed instead.
-func printMetricsSection(title string, metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, grafanaLinks []string, brief bool) {
+func printMetricsSection(title string, metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, brief bool) {
 	fmt.Println()
 	fmt.Println(bold(title + ":"))
 	if brief {
@@ -738,9 +737,6 @@ func printMetricsSection(title string, metrics map[string]aibom.MetricStats, ord
 	}
 	if includesColdStart {
 		fmt.Println("  (includes cold start)")
-	}
-	for _, link := range grafanaLinks {
-		fmt.Printf("  Grafana:         %s\n", link)
 	}
 	if !brief {
 		printMetricDetail(metrics, order, labels)

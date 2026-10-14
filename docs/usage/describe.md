@@ -10,7 +10,7 @@ Prints a human-readable summary of a single AIBOM instead of a raw YAML dump:
 - dataset, declared versus auto-detected, flagging mismatches
 - source provenance
 - environment
-- resource utilization (GPU, CPU, memory and network averages, plus any Grafana links)
+- resource utilization (GPU, CPU, memory and network averages)
 
 ## Performance detail
 
