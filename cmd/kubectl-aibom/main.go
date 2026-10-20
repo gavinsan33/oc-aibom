@@ -196,35 +196,15 @@ func main() {
 				return err
 			}
 			ctx := context.Background()
-			var runs []graphRun
-			var notes []string
+			items := make([]aibom.AIBOM, 0, len(args))
 			for _, name := range args {
 				a, err := aibom.Get(ctx, client, namespace, name)
 				if err != nil {
 					return err
 				}
-				sr := aibom.VerifySeries(ctx, client, a, aibom.Verify(ctx, client, a))
-				if sr.Status == aibom.SeriesMismatch {
-					notes = append(notes, fmt.Sprintf("%s: not charted, telemetry series %s", name, formatSeriesVerify(sr)))
-					continue
-				}
-				s, err := aibom.LoadSeries(ctx, client, a)
-				if err != nil {
-					notes = append(notes, fmt.Sprintf("%s: left out, %v", name, err))
-					continue
-				}
-				notes = append(notes, fmt.Sprintf("%s: telemetry series %s", name, formatSeriesVerify(sr)))
-				limits := map[string]float64{}
-				if a.Data.ResourceUtilization.Metrics != nil {
-					for k, m := range a.Data.ResourceUtilization.Metrics {
-						// The series is in raw base units; the stored limit is in display units.
-						if m.Limit != nil && *m.Limit > 0 {
-							limits[k] = limitInSeriesUnit(*m.Limit, m.Unit)
-						}
-					}
-				}
-				runs = append(runs, graphRun{Name: name, Series: s, Limits: limits})
+				items = append(items, a)
 			}
+			runs, notes := buildGraphRuns(ctx, client, items)
 			printNotes := func() { fmt.Fprintln(os.Stderr, strings.Join(notes, "\n")) }
 			if len(runs) == 0 {
 				printNotes()
