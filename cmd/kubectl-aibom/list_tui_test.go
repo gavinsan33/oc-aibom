@@ -105,10 +105,17 @@ func TestClearSelection(t *testing.T) {
 	m := testModel()
 	m.selected[0] = true
 	m.selected[2] = true
-	nm, _ := m.updateList(key("c"))
+	nm, _ := m.updateList(tea.KeyMsg{Type: tea.KeyEsc})
 	m = nm.(listModel)
 	if len(m.selected) != 0 {
-		t.Fatalf("clear left %d selected, want 0", len(m.selected))
+		t.Fatalf("esc clear left %d selected, want 0", len(m.selected))
+	}
+	// c must NOT clear selection in the list (it is the compare toggle).
+	m.selected[1] = true
+	nm, _ = m.updateList(key("c"))
+	m = nm.(listModel)
+	if !m.selected[1] {
+		t.Fatal("c should not clear the list selection")
 	}
 }
 

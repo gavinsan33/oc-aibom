@@ -125,7 +125,7 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.items) > 0 {
 			(&m).openGraph(m.graphTargets())
 		}
-	case "c", "esc":
+	case "esc":
 		m.selected = map[int]bool{}
 	case "left", "right", "h", "l":
 		(&m).hscroll(msg.String())
@@ -327,7 +327,20 @@ func (m *listModel) detailFromFocus() {
 	}
 }
 
-func (m listModel) pagerBodyH() int { return max(1, m.h-2) }
+// pagerFooterH counts the footer lines below the pager body: the key line,
+// plus the compare --changed indicator and any status line, each on its own row.
+func (m listModel) pagerFooterH() int {
+	h := 1
+	if m.pageKind == pageCompare {
+		h++
+	}
+	if m.status != "" {
+		h++
+	}
+	return h
+}
+
+func (m listModel) pagerBodyH() int { return max(1, m.h-1-m.pagerFooterH()) }
 
 func (m listModel) View() string {
 	switch m.mode {
@@ -343,7 +356,7 @@ func (m listModel) View() string {
 func (m listModel) listView() string {
 	faint := lipgloss.NewStyle().Faint(true)
 	title := lipgloss.NewStyle().Bold(true).Render("oc aibom") + faint.Render(fmt.Sprintf("  %d AIBOMs", len(m.items)))
-	help := faint.Render(" ↑↓ move · ←→ scroll · space select · c clear · enter detail/compare · g graph · q quit")
+	help := faint.Render(" ↑↓ move · ←→ scroll · space select · esc clear · enter detail/compare · g graph · q quit")
 
 	if len(m.items) == 0 {
 		return title + "\n\n  No AIBOMs found.\n\n" + help
@@ -391,8 +404,10 @@ func (m listModel) pagerView() string {
 	}
 	footer := lipgloss.NewStyle().Faint(true).Render(
 		fmt.Sprintf("%s · %d-%d/%d", keys, m.pageOff+1, end, len(m.pageLines)))
+	// The --changed state goes on its own line so it is never pushed off the
+	// right edge of a narrow terminal.
 	if m.pageKind == pageCompare {
-		footer += "   " + changedIndicator(m.pageChanged)
+		footer += "\n " + changedIndicator(m.pageChanged)
 	}
 	if m.status != "" {
 		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" "+m.status)
