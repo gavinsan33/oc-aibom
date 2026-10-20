@@ -34,14 +34,9 @@ func main() {
 	configFlags.AddFlags(root.PersistentFlags())
 	root.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 
-	var allNamespaces bool
-	var modelFilter, intentFilter, quantFilter string
-	var architectureFilter, frameworkFilter, gpuTypeFilter string
-	var jobFilter, gitBranchFilter, gitRepoFilter string
-	var servingEngineFilter, adaptationMethodFilter, optimizerFilter string
-	var driftOnly bool
-	var sortBy string
-	var ascending bool
+	// The no-arg root (interactive) and `list` share the same filter/sort
+	// flags, each with its own copy so cobra can bind them independently.
+	var rootOpts, listOpts listFilterFlags
 	listCmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls", "get"},
@@ -51,64 +46,37 @@ func main() {
 			if err != nil {
 				return err
 			}
-			ns := namespace
-			if allNamespaces {
-				ns = ""
-			}
-			items, err := aibom.List(context.Background(), client, ns)
+			items, err := listOpts.load(context.Background(), client, namespace)
 			if err != nil {
 				return err
 			}
-			items = aibom.Apply(items, aibom.Filter{
-				Model:            modelFilter,
-				Intent:           intentFilter,
-				Quantization:     quantFilter,
-				Architecture:     architectureFilter,
-				Framework:        frameworkFilter,
-				GPUType:          gpuTypeFilter,
-				JobName:          jobFilter,
-				GitBranch:        gitBranchFilter,
-				GitRepository:    gitRepoFilter,
-				ServingEngine:    servingEngineFilter,
-				AdaptationMethod: adaptationMethodFilter,
-				Optimizer:        optimizerFilter,
-			})
-			if driftOnly {
-				items = aibom.DriftOnly(items)
-			}
-			switch sortBy {
-			case "", "age":
-				// Default: List() itself only sorts alphabetically by
-				// namespace/name (kept that way since completeAIBOMNames
-				// also relies on it, for tab-completion), so `list` applies
-				// its own default of oldest-first by age on top of that
-				// unless a different --sort-by metric is requested.
-				aibom.SortByAge(items, ascending)
-			default:
-				if err := aibom.SortByMetric(items, sortBy, ascending); err != nil {
-					return err
-				}
-			}
-			printList(items, allNamespaces, sortBy)
+			printList(items, listOpts.allNamespaces, listOpts.sortBy)
 			return nil
 		},
 	}
-	listCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", false, "list AIBOMs across all namespaces")
-	listCmd.Flags().StringVar(&modelFilter, "model", "", "filter by model.name")
-	listCmd.Flags().StringVar(&intentFilter, "intent", "", "filter by experiment intent (training|sft|inference)")
-	listCmd.Flags().StringVar(&quantFilter, "quantization", "", "filter by model.quantization")
-	listCmd.Flags().StringVar(&architectureFilter, "architecture", "", "filter by model.architecture")
-	listCmd.Flags().StringVar(&frameworkFilter, "framework", "", "filter by model.framework")
-	listCmd.Flags().StringVar(&gpuTypeFilter, "gpu-type", "", "filter by environment.gpu_type")
-	listCmd.Flags().StringVar(&jobFilter, "job", "", "filter by job name")
-	listCmd.Flags().StringVar(&gitBranchFilter, "git-branch", "", "filter by source_code.git_branch")
-	listCmd.Flags().StringVar(&gitRepoFilter, "git-repository", "", "filter by source_code.git_repository")
-	listCmd.Flags().StringVar(&servingEngineFilter, "serving-engine", "", "filter by inference.serving_engine")
-	listCmd.Flags().StringVar(&adaptationMethodFilter, "adaptation-method", "", "filter by fine_tuning.adaptation_method")
-	listCmd.Flags().StringVar(&optimizerFilter, "optimizer", "", "filter by training.optimizer")
-	listCmd.Flags().BoolVar(&driftOnly, "drift-only", false, "only show AIBOMs where auto-detected dataset(s) disagree with the declared dataset")
-	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx); defaults to 'age' (oldest AIBOM first)")
-	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first; for the default age sort, shows most recently collected first)")
+	listOpts.register(listCmd)
+
+	// With no subcommand, `oc aibom` opens the interactive browser on a
+	// terminal, falling back to the plain `list` output when stdout is piped
+	// or redirected (so `oc aibom | grep` still works). Explicit subcommands
+	// are always print-only.
+	root.Args = cobra.NoArgs
+	root.RunE = func(cmd *cobra.Command, args []string) error {
+		client, namespace, err := buildClient(configFlags)
+		if err != nil {
+			return err
+		}
+		items, err := rootOpts.load(context.Background(), client, namespace)
+		if err != nil {
+			return err
+		}
+		if !term.IsTerminal(int(os.Stdout.Fd())) {
+			printList(items, rootOpts.allNamespaces, rootOpts.sortBy)
+			return nil
+		}
+		return runListTUI(items, client, rootOpts.allNamespaces, rootOpts.sortBy)
+	}
+	rootOpts.register(root)
 
 	var brief bool
 	getCmd := &cobra.Command{
@@ -292,6 +260,63 @@ func buildClient(configFlags *genericclioptions.ConfigFlags) (dynamic.Interface,
 		return nil, "", fmt.Errorf("resolving namespace: %w", err)
 	}
 	return client, namespace, nil
+}
+
+// listFilterFlags is the filter/sort state shared by the `list` subcommand
+// and the no-arg interactive root, registered on each via register.
+type listFilterFlags struct {
+	allNamespaces bool
+	driftOnly     bool
+	ascending     bool
+	sortBy        string
+	f             aibom.Filter
+}
+
+func (o *listFilterFlags) register(cmd *cobra.Command) {
+	fl := cmd.Flags()
+	fl.BoolVarP(&o.allNamespaces, "all-namespaces", "A", false, "list AIBOMs across all namespaces")
+	fl.StringVar(&o.f.Model, "model", "", "filter by model.name")
+	fl.StringVar(&o.f.Intent, "intent", "", "filter by experiment intent (training|sft|inference)")
+	fl.StringVar(&o.f.Quantization, "quantization", "", "filter by model.quantization")
+	fl.StringVar(&o.f.Architecture, "architecture", "", "filter by model.architecture")
+	fl.StringVar(&o.f.Framework, "framework", "", "filter by model.framework")
+	fl.StringVar(&o.f.GPUType, "gpu-type", "", "filter by environment.gpu_type")
+	fl.StringVar(&o.f.JobName, "job", "", "filter by job name")
+	fl.StringVar(&o.f.GitBranch, "git-branch", "", "filter by source_code.git_branch")
+	fl.StringVar(&o.f.GitRepository, "git-repository", "", "filter by source_code.git_repository")
+	fl.StringVar(&o.f.ServingEngine, "serving-engine", "", "filter by inference.serving_engine")
+	fl.StringVar(&o.f.AdaptationMethod, "adaptation-method", "", "filter by fine_tuning.adaptation_method")
+	fl.StringVar(&o.f.Optimizer, "optimizer", "", "filter by training.optimizer")
+	fl.BoolVar(&o.driftOnly, "drift-only", false, "only show AIBOMs where auto-detected dataset(s) disagree with the declared dataset")
+	fl.StringVar(&o.sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx); defaults to 'age' (oldest AIBOM first)")
+	fl.BoolVar(&o.ascending, "ascending", false, "reverse --sort-by order (lowest first; for the default age sort, shows most recently collected first)")
+}
+
+// load fetches, filters, and sorts AIBOMs per the flags. The default sort is
+// oldest-first by age (List itself only sorts by namespace/name, which
+// completeAIBOMNames relies on for tab-completion).
+func (o *listFilterFlags) load(ctx context.Context, client dynamic.Interface, namespace string) ([]aibom.AIBOM, error) {
+	ns := namespace
+	if o.allNamespaces {
+		ns = ""
+	}
+	items, err := aibom.List(ctx, client, ns)
+	if err != nil {
+		return nil, err
+	}
+	items = aibom.Apply(items, o.f)
+	if o.driftOnly {
+		items = aibom.DriftOnly(items)
+	}
+	switch o.sortBy {
+	case "", "age":
+		aibom.SortByAge(items, o.ascending)
+	default:
+		if err := aibom.SortByMetric(items, o.sortBy, o.ascending); err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
 }
 
 // metricLabels are the display headers for aibom.SortableMetrics keys.
