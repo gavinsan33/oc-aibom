@@ -101,6 +101,21 @@ func TestHscrollClamps(t *testing.T) {
 	}
 }
 
+func TestResizeClampsPagerOffset(t *testing.T) {
+	m := testModel()
+	m.mode = modePager
+	m.pageLines = []string{"1", "2", "3", "4", "5"}
+	m.pageOff = 4
+	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
+	m = nm.(listModel)
+	if maxOff := len(m.pageLines) - m.pagerBodyH(); m.pageOff > max(0, maxOff) {
+		t.Fatalf("pageOff %d exceeds clamp %d after resize", m.pageOff, maxOff)
+	}
+	if cmd == nil {
+		t.Fatal("resize should return a repaint command")
+	}
+}
+
 func TestSpaceTogglesSelection(t *testing.T) {
 	m := testModel()
 	space := tea.KeyMsg{Type: tea.KeySpace}

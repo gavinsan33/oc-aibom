@@ -58,7 +58,11 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			nm, _ := m.gm.Update(msg)
 			m.gm = nm.(graphModel)
 		}
-		return m, nil
+		// Keep the scroll offsets valid for the new size, then force a full
+		// repaint so shrinking the window doesn't leave stale lines behind.
+		m.hoff = max(0, min(m.hoff, m.contentWidth()-m.hViewW()))
+		m.pageOff = max(0, min(m.pageOff, len(m.pageLines)-m.pagerBodyH()))
+		return m, tea.ClearScreen
 	case tea.KeyMsg:
 		switch m.mode {
 		case modeGraph:
