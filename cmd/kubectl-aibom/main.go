@@ -74,7 +74,7 @@ func main() {
 			printList(items, rootOpts.allNamespaces, rootOpts.sortBy)
 			return nil
 		}
-		return runListTUI(items, client, rootOpts.allNamespaces, rootOpts.sortBy)
+		return runListTUI(items, client, rootOpts.allNamespaces, rootOpts.sortBy, rootOpts.ascending)
 	}
 	rootOpts.register(root)
 

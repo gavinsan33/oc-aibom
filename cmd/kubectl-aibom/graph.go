@@ -56,10 +56,11 @@ func sparkline(pts [][2]float64, width int, lo, hi float64) string {
 // ponytail: mirrors the webhook's unit_map by hand; add a case if it grows.
 func limitInSeriesUnit(limit float64, displayUnit string) float64 {
 	switch displayUnit {
-	case "GiB":
+	case "GiB", "GB":
+		// The webhook labels binary GiB (2^30) as either "GiB" or "GB" for the
+		// same value, so "GB" is NOT decimal 1e9 here -- treating it as such
+		// drew the limit line ~7% low, below data sitting at the true limit.
 		return limit * (1 << 30) // -> bytes
-	case "GB":
-		return limit * 1e9 // -> bytes (older label)
 	case "Mbps":
 		return limit * (1e6 / 8) // -> bytes_per_sec
 	case "MBps":

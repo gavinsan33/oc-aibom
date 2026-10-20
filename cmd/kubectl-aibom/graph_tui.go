@@ -25,7 +25,8 @@ type graphModel struct {
 	w, h      int
 	sharedMax int64
 	hidden    map[int]bool // run index -> hidden via 1-9
-	embedded  bool         // hosted inside the browser: offer "d detail", back vs quit
+	hideLimit bool         // suppress the red limit line (toggled with t)
+	embedded  bool         // hosted inside the browser: show page tabs, back vs quit
 }
 
 func newGraphModel(runs []graphRun, metrics []string, pods bool) graphModel {
@@ -59,6 +60,8 @@ func (m graphModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.zoom = !m.zoom
 		case "p":
 			m.pods = !m.pods
+		case "t":
+			m.hideLimit = !m.hideLimit
 		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 			if i := int(msg.String()[0] - '1'); i < len(m.runs) {
 				hidden := map[int]bool{}
@@ -221,13 +224,18 @@ func renderChart(rows []graphRow, lo, hi float64, unit string, limit float64, sh
 				best, bestN = ci, n
 			}
 		}
+		// Series dots always paint over the red limit line: where a run passes
+		// through the limit's row, show the run (or overlap) color, not red.
+		if union != 0 {
+			if overlap {
+				return overlapColor, union
+			}
+			return tuiColors[best%len(tuiColors)], union
+		}
 		if limitMask != 0 {
 			return lipgloss.Color("1"), limitMask // red, just the limit's own row
 		}
-		if overlap {
-			return overlapColor, union
-		}
-		return tuiColors[best%len(tuiColors)], union
+		return "", 0
 	}
 
 	axis := lipgloss.NewStyle().Faint(true)
@@ -279,6 +287,9 @@ func abs(n int) int {
 
 func (m graphModel) panel(k string, selected bool, w, h int) string {
 	all, unit, limit := graphRows(m.runs, k, m.pods)
+	if m.hideLimit {
+		limit = 0
+	}
 	lo, hi := graphRange(all)
 	border := lipgloss.Color("8")
 	if selected {
@@ -329,20 +340,21 @@ func (m graphModel) View() string {
 		lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("   0 → %s elapsed", fmtElapsed(m.sharedMax)))
 	stats := m.statsLines()
 	exit := "q quit"
-	detail := ""
+	tabs, extraH := "", 0
 	if m.embedded {
 		exit = "q back"
-		detail = "d detail · "
+		tabs = navTabs("graph") + "\n"
+		extraH = 1
 	}
-	helpText := " ←↑↓→ select · enter zoom · p per-pod/GPU · 1-9 hide/show run · " + detail + exit
+	helpText := " ←↑↓→ select · enter zoom · p per-pod/GPU · t limit · 1-9 hide/show · " + exit
 	if m.zoom {
-		helpText = " ←↑↓→ select · enter/q back · p per-pod/GPU · 1-9 hide/show run · ctrl+c quit"
+		helpText = " ←↑↓→ select · enter/q back · p per-pod/GPU · t limit · 1-9 hide/show · ctrl+c quit"
 	}
 	help := lipgloss.NewStyle().Faint(true).Render(helpText)
 	footer := strings.Join(append(stats, help), "\n")
-	bodyH := m.h - 1 - len(stats) - 1
+	bodyH := m.h - 1 - len(stats) - 1 - extraH
 	if bodyH < 6 {
-		return header + "\n" + help
+		return tabs + header + "\n" + help
 	}
 
 	var body string
@@ -372,7 +384,7 @@ func (m graphModel) View() string {
 		}
 		body = strings.Join(grid, "\n")
 	}
-	return header + "\n" + body + "\n" + footer
+	return tabs + header + "\n" + body + "\n" + footer
 }
 
 func runGraphTUI(runs []graphRun, metrics []string, pods bool) error {

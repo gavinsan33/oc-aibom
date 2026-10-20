@@ -22,7 +22,38 @@ const (
 	modeList = iota
 	modePager
 	modeGraph
+	modeSort
+	modeFilter
 )
+
+// sortOptions are the sort keys the interactive "sort by" menu (s) offers, in
+// display order: "age" plus the aibom.SortableMetrics keys. Labels come from
+// metricLabels, with "Age" special-cased.
+var sortOptions = []string{
+	"age", "gpu-utilization", "gpu-memory", "gpu-power",
+	"cpu-usage", "memory-usage", "network-rx", "network-tx",
+}
+
+// navTabs renders the detail/graph page tabs for the embedded browser views,
+// highlighting the active page so d/g read as switching to a separate page
+// rather than acting on the current view. active is "detail" or "graph".
+func navTabs(active string) string {
+	tab := func(key, label, name string) string {
+		s := fmt.Sprintf("[%s] %s", key, label)
+		if name == active {
+			return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(s)
+		}
+		return lipgloss.NewStyle().Faint(true).Render(s)
+	}
+	return " " + tab("d", "Detail view", "detail") + "   " + tab("g", "Graph view", "graph")
+}
+
+func sortLabel(key string) string {
+	if key == "age" {
+		return "Age"
+	}
+	return metricLabels[key]
+}
 
 const (
 	pageDetail = iota
@@ -30,12 +61,16 @@ const (
 )
 
 type listModel struct {
+	all    []aibom.AIBOM // master list; items is the filtered+sorted view of it
 	items  []aibom.AIBOM
+	filter string // live substring filter over the visible columns (f)
 	client dynamic.Interface
-	allNS  bool
-	sortBy string
+	allNS     bool
+	sortBy    string
+	ascending bool
 
-	cursor   int
+	cursor     int
+	sortCursor int // cursor in the sort-by menu (modeSort)
 	selected map[int]bool
 	w, h     int
 	hoff     int // horizontal scroll offset, reset on every mode change
@@ -81,6 +116,10 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateGraph(msg)
 		case modePager:
 			return m.updatePager(msg)
+		case modeSort:
+			return m.updateSort(msg)
+		case modeFilter:
+			return m.updateFilter(msg)
 		default:
 			return m.updateList(msg)
 		}
@@ -126,12 +165,110 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.items) > 0 {
 			(&m).openGraph(m.graphTargets())
 		}
+	case "s":
+		m.sortCursor = indexOf(sortOptions, m.sortBy)
+		m.mode = modeSort
+	case "f", "/":
+		m.mode = modeFilter
 	case "esc":
 		m.selected = map[int]bool{}
 	case "left", "right", "h", "l":
 		(&m).hscroll(msg.String())
 	}
 	return m, nil
+}
+
+// updateSort drives the "sort by" menu: up/down pick a field, space/←/→ flip
+// the direction, enter applies and returns to the list, esc/q cancels.
+func (m listModel) updateSort(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "q", "esc":
+		m.mode = modeList
+	case "up", "k":
+		if m.sortCursor > 0 {
+			m.sortCursor--
+		}
+	case "down", "j":
+		if m.sortCursor < len(sortOptions)-1 {
+			m.sortCursor++
+		}
+	case " ", "left", "right", "h", "l":
+		m.ascending = !m.ascending
+	case "enter":
+		m.sortBy = sortOptions[m.sortCursor]
+		(&m).refresh()
+		m.mode = modeList
+	}
+	return m, nil
+}
+
+// updateFilter is the live substring-filter prompt (f): printable keys edit the
+// query and re-filter as you type, enter keeps it, esc clears it.
+func (m listModel) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyCtrlC:
+		return m, tea.Quit
+	case tea.KeyEsc:
+		m.filter = ""
+		(&m).refresh()
+		m.mode = modeList
+	case tea.KeyEnter:
+		m.mode = modeList
+	case tea.KeyBackspace:
+		if m.filter != "" {
+			m.filter = m.filter[:len(m.filter)-1]
+			(&m).refresh()
+		}
+	case tea.KeyRunes, tea.KeySpace:
+		m.filter += string(msg.Runes)
+		(&m).refresh()
+	}
+	return m, nil
+}
+
+// refresh rebuilds items as the current filter applied to the master list,
+// sorted by the current sortBy/ascending, then resets the cursor and clears the
+// (now index-invalid) selection.
+func (m *listModel) refresh() {
+	m.items = filterItems(m.all, m.filter)
+	switch m.sortBy {
+	case "", "age":
+		aibom.SortByAge(m.items, m.ascending)
+	default:
+		_ = aibom.SortByMetric(m.items, m.sortBy, m.ascending) // keys are from sortOptions
+	}
+	m.cursor = 0
+	m.selected = map[int]bool{}
+}
+
+// filterItems returns a new slice of the items whose visible columns contain q
+// (case-insensitive). An empty query copies all items (so sorting the result
+// never reorders the master list).
+func filterItems(items []aibom.AIBOM, q string) []aibom.AIBOM {
+	q = strings.ToLower(strings.TrimSpace(q))
+	out := make([]aibom.AIBOM, 0, len(items))
+	for _, a := range items {
+		hay := strings.ToLower(strings.Join([]string{
+			a.Namespace, a.Name, a.JobName, a.Data.Model.Name, a.ExperimentIntent,
+			a.Data.Model.Quantization, a.Data.Environment.GPUType,
+			a.Data.ExecutionMetadata.Status,
+		}, " "))
+		if q == "" || strings.Contains(hay, q) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+func indexOf(ss []string, s string) int {
+	for i, v := range ss {
+		if v == s {
+			return i
+		}
+	}
+	return 0
 }
 
 func (m listModel) updatePager(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -342,7 +479,8 @@ func (m listModel) pagerFooterH() int {
 	return h
 }
 
-func (m listModel) pagerBodyH() int { return max(1, m.h-1-m.pagerFooterH()) }
+// pagerBodyH reserves a line for the nav tabs, the title, and the footer.
+func (m listModel) pagerBodyH() int { return max(1, m.h-2-m.pagerFooterH()) }
 
 func (m listModel) View() string {
 	switch m.mode {
@@ -350,6 +488,8 @@ func (m listModel) View() string {
 		return m.gm.View()
 	case modePager:
 		return m.pagerView()
+	case modeSort:
+		return m.sortView()
 	default:
 		return m.listView()
 	}
@@ -358,15 +498,22 @@ func (m listModel) View() string {
 func (m listModel) listView() string {
 	faint := lipgloss.NewStyle().Faint(true)
 	title := lipgloss.NewStyle().Bold(true).Render("oc aibom") + faint.Render(fmt.Sprintf("  %d AIBOMs", len(m.items)))
-	help := faint.Render(" ↑↓ move · ←→ scroll · space select · esc clear · enter detail/compare · g graph · q quit")
+	if m.filter != "" && m.mode != modeFilter {
+		title += faint.Render(fmt.Sprintf(" · filter: %q", m.filter))
+	}
+	footer := m.listFooter(faint)
 
 	if len(m.items) == 0 {
-		return title + "\n\n  No AIBOMs found.\n\n" + help
+		empty := "  No AIBOMs found."
+		if m.filter != "" {
+			empty = "  No matches."
+		}
+		return title + "\n\n" + empty + "\n\n" + footer
 	}
 
 	header, body := m.listLines() // body[i] aligns with m.items[i]
 
-	avail := max(1, m.h-4) // title, header, help, status
+	avail := max(1, m.h-5) // title, header, 2 footer lines, status
 	start := 0
 	if m.cursor >= avail {
 		start = m.cursor - avail + 1
@@ -392,11 +539,30 @@ func (m listModel) listView() string {
 		}
 		b.WriteString(row + "\n")
 	}
-	b.WriteString(help)
+	b.WriteString(footer)
 	if m.status != "" {
-		b.WriteString("\n" + faint.Render(" "+m.status))
+		b.WriteString("\n" + m.statusLine(faint))
 	}
 	return b.String()
+}
+
+// statusLine renders the transient status (telemetry notes, errors) as a single
+// faint line clamped to the terminal width. The notes can be long multi-clause
+// sentences joined across runs, which would otherwise wrap and look broken.
+func (m listModel) statusLine(faint lipgloss.Style) string {
+	return ansi.Truncate(faint.Render(" "+m.status), max(1, m.w), "…")
+}
+
+// listFooter is the two-line tip bar under the list, or the live filter prompt
+// when the filter input is open.
+func (m listModel) listFooter(faint lipgloss.Style) string {
+	if m.mode == modeFilter {
+		caret := lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Render("▏")
+		return faint.Render(" filter: ") + m.filter + caret + "\n" +
+			faint.Render(" enter apply · esc clear")
+	}
+	return faint.Render(" ↑↓ move · ←→ scroll · space select · enter detail/compare") + "\n" +
+		faint.Render(" s sort · f filter · g graph · esc clear · q quit")
 }
 
 func (m listModel) pagerView() string {
@@ -405,14 +571,14 @@ func (m listModel) pagerView() string {
 	title := lipgloss.NewStyle().Bold(true).Render(m.pageTitle)
 
 	footer := lipgloss.NewStyle().Faint(true).Render(
-		fmt.Sprintf(" ↑↓ ←→ scroll · g graph · q back · %d-%d/%d", m.pageOff+1, end, len(m.pageLines)))
+		fmt.Sprintf(" ↑↓ ←→ scroll · q back · %d-%d/%d", m.pageOff+1, end, len(m.pageLines)))
 	// The --changed toggle and its state get their own line so the hint is
 	// clear and never pushed off the right edge of a narrow terminal.
 	if m.pageKind == pageCompare {
 		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" c · ") + changedIndicator(m.pageChanged)
 	}
 	if m.status != "" {
-		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" "+m.status)
+		footer += "\n" + m.statusLine(lipgloss.NewStyle().Faint(true))
 	}
 
 	visible := make([]string, 0, end-m.pageOff)
@@ -420,7 +586,37 @@ func (m listModel) pagerView() string {
 		visible = append(visible, hslice(l, m.hoff, m.w))
 	}
 	// Blank separator between the content and the footer tips.
-	return title + "\n" + strings.Join(visible, "\n") + "\n\n" + footer
+	return navTabs("detail") + "\n" + title + "\n" + strings.Join(visible, "\n") + "\n\n" + footer
+}
+
+// sortView draws the "sort by" menu: the field list with the active one marked,
+// the current direction, and a key hint.
+func (m listModel) sortView() string {
+	faint := lipgloss.NewStyle().Faint(true)
+	dir := "descending (highest first)"
+	if m.ascending {
+		dir = "ascending (lowest first)"
+	}
+	if sortOptions[m.sortCursor] == "age" { // age's "value" is time, so label it in time terms
+		dir = "oldest first"
+		if m.ascending {
+			dir = "most recent first"
+		}
+	}
+	var b strings.Builder
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Sort by") + "\n\n")
+	for i, key := range sortOptions {
+		cur := "  "
+		label := sortLabel(key)
+		if i == m.sortCursor {
+			cur = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true).Render("▸ ")
+			label = lipgloss.NewStyle().Bold(true).Render(label)
+		}
+		b.WriteString("  " + cur + label + "\n")
+	}
+	b.WriteString("\n  " + faint.Render("direction: ") + dir + "\n\n")
+	b.WriteString(faint.Render(" ↑↓ field · space/←→ direction · enter apply · esc cancel"))
+	return b.String()
 }
 
 // changedIndicator is the bottom-of-screen toggle state for compare's
@@ -513,14 +709,19 @@ func stripeBG() string {
 	return "\x1b[48;5;254m" // off-white
 }
 
-func runListTUI(items []aibom.AIBOM, client dynamic.Interface, allNS bool, sortBy string) error {
+func runListTUI(items []aibom.AIBOM, client dynamic.Interface, allNS bool, sortBy string, ascending bool) error {
+	if sortBy == "" {
+		sortBy = "age"
+	}
 	m := listModel{
-		items:    items,
-		client:   client,
-		allNS:    allNS,
-		sortBy:   sortBy,
-		selected: map[int]bool{},
-		stripeBG: stripeBG(), // resolved once; HasDarkBackground queries the terminal
+		all:       items,
+		items:     items,
+		client:    client,
+		allNS:     allNS,
+		sortBy:    sortBy,
+		ascending: ascending,
+		selected:  map[int]bool{},
+		stripeBG:  stripeBG(), // resolved once; HasDarkBackground queries the terminal
 	}
 	_, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
 	return err

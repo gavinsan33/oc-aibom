@@ -65,6 +65,10 @@ func TestLimitInSeriesUnit(t *testing.T) {
 	if got := limitInSeriesUnit(8, "GiB"); got != 8*(1<<30) {
 		t.Fatalf("GiB: %v", got)
 	}
+	// "GB" is the webhook's older label for the same binary GiB, not decimal 1e9.
+	if got := limitInSeriesUnit(8, "GB"); got != 8*(1<<30) {
+		t.Fatalf("GB: %v", got)
+	}
 	if got := limitInSeriesUnit(50, "MBps"); got != 50e6 {
 		t.Fatalf("MBps: %v", got)
 	}
@@ -153,6 +157,32 @@ func TestGraphModelOverlapAndHide(t *testing.T) {
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
 	if out := box(); !strings.Contains(out, "\x1b[35m") || strings.Contains(out, "\x1b[97m") {
 		t.Fatalf("expected run 2's color and no overlap color after hiding run 1")
+	}
+}
+
+func TestGraphModelToggleLimit(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.ANSI)
+	defer lipgloss.SetColorProfile(termenv.Ascii)
+
+	var s aibom.Series
+	s.Window.Start, s.Window.End = 1000, 1060
+	s.Metrics = map[string]aibom.SeriesMetric{
+		"gpu_utilization": {Unit: "percent", Aggregate: [][2]float64{{1000, 10}, {1060, 90}}},
+	}
+	runs := []graphRun{{Name: "r", Series: s, Limits: map[string]float64{"gpu_utilization": 50}}}
+	keys, _ := graphMetricKeys(runs, nil)
+	var m tea.Model = newGraphModel(runs, keys, false)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
+	box := func() string {
+		v := m.View()
+		return v[strings.Index(v, "╭"):strings.Index(v, "╯")]
+	}
+	if !strings.Contains(box(), "\x1b[31m") { // red limit line visible by default
+		t.Fatal("expected red limit line in the panel")
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	if strings.Contains(box(), "\x1b[31m") {
+		t.Fatal("t should hide the red limit line")
 	}
 }
 
