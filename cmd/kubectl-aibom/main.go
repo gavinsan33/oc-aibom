@@ -819,11 +819,13 @@ func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
 		if changedOnly && !fr.Differs {
 			continue
 		}
-		label := labelCell(fr.Label)
+		// Differing fields stand out in plain cyan -- between the default of the
+		// unchanged rows and the bold cyan of the FIELD/METRIC headers.
+		label := plainCell(fr.Label)
 		if fr.Differs {
 			anyDiff = true
 			marked := fr.Label + " *" // visible even with color disabled
-			label = coloredCell(marked, boldColorize(ansiCyan, marked))
+			label = coloredCell(marked, cyan(marked))
 		}
 		cells := []cell{label}
 		for i, v := range fr.Values {
