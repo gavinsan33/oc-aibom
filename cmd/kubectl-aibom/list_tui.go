@@ -421,12 +421,14 @@ func (m listModel) pagerView() string {
 }
 
 // changedIndicator is the bottom-of-screen toggle state for compare's
-// --changed filter: green when on (only differing fields), faint when off.
+// --changed filter: a checkbox labelled "show only changed fields", green and
+// ticked when on, faint and empty when off. The "c" key (shown in the footer)
+// toggles it.
 func changedIndicator(on bool) string {
 	if on {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true).Render("[--changed ON]")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true).Render("[✓] show only changed fields")
 	}
-	return lipgloss.NewStyle().Faint(true).Render("[--changed off]")
+	return lipgloss.NewStyle().Faint(true).Render("[ ] show only changed fields")
 }
 
 // hslice returns the visible columns [off, off+width) of s, preserving the
