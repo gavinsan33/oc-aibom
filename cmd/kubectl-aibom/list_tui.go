@@ -200,7 +200,7 @@ func (m *listModel) openDetail(a aibom.AIBOM) {
 
 func (m *listModel) openCompare(items []aibom.AIBOM) {
 	var b strings.Builder
-	printCompare(&b, items)
+	printCompare(&b, items, false)
 	m.openPager(fmt.Sprintf("compare (%d AIBOMs)", len(items)), b.String())
 }
 

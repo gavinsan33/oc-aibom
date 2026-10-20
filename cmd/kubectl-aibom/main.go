@@ -103,7 +103,7 @@ func main() {
 
 	diffCmd := &cobra.Command{
 		Use:               "diff <name-a> <name-b>",
-		Short:             "Show field-level differences between two AIBOMs",
+		Short:             "Show only the fields that differ between two AIBOMs (compare --changed)",
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: completeAIBOMNames(configFlags, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -111,23 +111,19 @@ func main() {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			a, err := aibom.Get(ctx, client, namespace, args[0])
+			items, err := getAIBOMs(context.Background(), client, namespace, args)
 			if err != nil {
 				return err
 			}
-			b, err := aibom.Get(ctx, client, namespace, args[1])
-			if err != nil {
-				return err
-			}
-			printDiff(args[0], args[1], aibom.Diff(a, b), aibom.DiffPerformance(a, b))
+			printCompare(os.Stdout, items, true)
 			return nil
 		},
 	}
 
+	var compareChanged bool
 	compareCmd := &cobra.Command{
 		Use:               "compare <name> <name> [<name>...]",
-		Short:             "Show performance metrics for two or more AIBOMs side by side",
+		Short:             "Compare two or more AIBOMs field by field, with performance side by side",
 		Args:              cobra.MinimumNArgs(2),
 		ValidArgsFunction: completeAIBOMNames(configFlags, 0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -135,19 +131,15 @@ func main() {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			items := make([]aibom.AIBOM, 0, len(args))
-			for _, name := range args {
-				a, err := aibom.Get(ctx, client, namespace, name)
-				if err != nil {
-					return err
-				}
-				items = append(items, a)
+			items, err := getAIBOMs(context.Background(), client, namespace, args)
+			if err != nil {
+				return err
 			}
-			printCompare(os.Stdout, items)
+			printCompare(os.Stdout, items, compareChanged)
 			return nil
 		},
 	}
+	compareCmd.Flags().BoolVar(&compareChanged, "changed", false, "show only the fields that differ across the compared AIBOMs")
 
 	var graphMetrics []string
 	var graphPods bool
@@ -164,13 +156,9 @@ func main() {
 				return err
 			}
 			ctx := context.Background()
-			items := make([]aibom.AIBOM, 0, len(args))
-			for _, name := range args {
-				a, err := aibom.Get(ctx, client, namespace, name)
-				if err != nil {
-					return err
-				}
-				items = append(items, a)
+			items, err := getAIBOMs(ctx, client, namespace, args)
+			if err != nil {
+				return err
 			}
 			runs, notes := buildGraphRuns(ctx, client, items)
 			printNotes := func() { fmt.Fprintln(os.Stderr, strings.Join(notes, "\n")) }
@@ -260,6 +248,20 @@ func buildClient(configFlags *genericclioptions.ConfigFlags) (dynamic.Interface,
 		return nil, "", fmt.Errorf("resolving namespace: %w", err)
 	}
 	return client, namespace, nil
+}
+
+// getAIBOMs fetches the named AIBOMs in order, failing on the first missing
+// one (shared by compare, diff, and graph).
+func getAIBOMs(ctx context.Context, client dynamic.Interface, namespace string, names []string) ([]aibom.AIBOM, error) {
+	items := make([]aibom.AIBOM, 0, len(names))
+	for _, name := range names {
+		a, err := aibom.Get(ctx, client, namespace, name)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, a)
+	}
+	return items, nil
 }
 
 // listFilterFlags is the filter/sort state shared by the `list` subcommand
@@ -795,86 +797,83 @@ func maxCell(max float64, limit *float64) cell {
 	}
 }
 
-func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.MetricDiff) {
-	if len(diffs) == 0 {
-		fmt.Printf("No differences found between %s and %s (across compared config/metadata fields).\n", nameA, nameB)
-	} else {
-		rows := [][]cell{{labelHeaderCell("FIELD"), runHeaderCell(0, nameA), runHeaderCell(1, nameB)}}
-		for _, d := range diffs {
-			rows = append(rows, []cell{labelCell(d.Field), plainCell(d.A), plainCell(d.B)})
-		}
-		writeTable(os.Stdout, rows)
-	}
-
-	fmt.Println()
-	fmt.Println(bold("Performance:"))
-	rows := [][]cell{{
-		labelHeaderCell("METRIC"), runHeaderCell(0, nameA), runHeaderCell(1, nameB),
-		coloredCell("DELTA", bold("DELTA")), coloredCell("CHANGE", bold("CHANGE")),
-	}}
-	for _, m := range metrics {
-		deltaText := fmt.Sprintf("%+.2f", m.Delta)
-		changeText := formatPctChange(m.PctChange)
-		rows = append(rows, []cell{
-			labelCell(m.Metric),
-			plainCell(formatMetric(m.A)),
-			plainCell(formatMetric(m.B)),
-			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
-			coloredCell(changeText, colorBySign(m.PctChange, changeText)),
-		})
-	}
-	writeTable(os.Stdout, rows)
-}
-
-func printCompare(w io.Writer, items []aibom.AIBOM) {
-	header := make([]cell, len(items)+1)
-	header[0] = labelHeaderCell("FIELD")
-	for i, a := range items {
-		header[i+1] = runHeaderCell(i, a.Name)
-	}
-	rows := [][]cell{header}
-
-	row := func(label string, values func(aibom.AIBOM) string) {
-		cells := make([]cell, len(items)+1)
-		cells[0] = labelCell(label)
+// printCompare renders the console plugin's compare Overview: a Fields table
+// (every compared field, one column per run, differing fields flagged) and a
+// Hardware Performance table (one column per run, plus Delta/Change columns
+// when exactly two runs are compared). With changedOnly, unchanged field rows
+// are hidden -- this is what `diff` (a two-run compare --changed) uses.
+func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
+	runHeader := func(label string, extra ...cell) [][]cell {
+		h := make([]cell, 0, len(items)+1+len(extra))
+		h = append(h, labelHeaderCell(label))
 		for i, a := range items {
-			cells[i+1] = runCell(i, values(a))
+			h = append(h, runHeaderCell(i, a.Name))
+		}
+		return [][]cell{append(h, extra...)}
+	}
+
+	fmt.Fprintln(w, bold("Fields:"))
+	rows := runHeader("FIELD")
+	anyDiff := false
+	for _, fr := range aibom.CompareFields(items) {
+		if changedOnly && !fr.Differs {
+			continue
+		}
+		label := labelCell(fr.Label)
+		if fr.Differs {
+			anyDiff = true
+			marked := fr.Label + " *" // visible even with color disabled
+			label = coloredCell(marked, boldColorize(ansiYellow, marked))
+		}
+		cells := []cell{label}
+		for i, v := range fr.Values {
+			if v == "" {
+				v = "-"
+			}
+			cells = append(cells, runCell(i, v))
 		}
 		rows = append(rows, cells)
 	}
-
-	row("Model", func(a aibom.AIBOM) string { return a.Data.Model.Name })
-	row("Quantization", func(a aibom.AIBOM) string { return a.Data.Model.Quantization })
-	row("Intent", func(a aibom.AIBOM) string { return a.ExperimentIntent })
-	row("GPU Type", func(a aibom.AIBOM) string { return a.Data.Environment.GPUType })
-	writeTable(w, rows)
-	fmt.Fprintln(w)
-
-	fmt.Fprintln(w, bold("Performance:"))
-	metricHeader := make([]cell, len(items)+1)
-	metricHeader[0] = labelHeaderCell("METRIC")
-	for i, a := range items {
-		metricHeader[i+1] = runHeaderCell(i, a.Name)
+	if len(rows) == 1 {
+		fmt.Fprintln(w, "  (no differing fields)")
+	} else {
+		writeTable(w, rows)
 	}
-	rows = [][]cell{metricHeader}
-	for _, m := range []struct {
-		label string
-		get   func(aibom.ResourceUtilization) float64
-	}{
-		{"GPU Utilization %", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_utilization") }},
-		{"GPU Memory (MiB)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_memory_used") }},
-		{"GPU Power (W)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_power") }},
-		{"CPU Usage (cores)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("cpu_usage") }},
-		{"Memory Usage (GB)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("memory_usage") }},
-		{"Network RX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("network_receive") }},
-		{"Network TX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("network_transmit") }},
-	} {
-		row(m.label, func(a aibom.AIBOM) string {
-			if a.Data.ResourceUtilization.Note != "" {
-				return "-"
+	if anyDiff {
+		fmt.Fprintln(w, faint("  * field differs across runs"))
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold("Hardware Performance:"))
+	twoWay := len(items) == 2
+	var extra []cell
+	if twoWay {
+		extra = []cell{coloredCell("DELTA", bold("DELTA")), coloredCell("CHANGE", bold("CHANGE"))}
+	}
+	rows = runHeader("METRIC", extra...)
+	for _, mr := range aibom.ComparePerformance(items, telemetryMetricOrder) {
+		cells := []cell{labelCell(telemetryMetricLabels[mr.Key])}
+		for i := range items {
+			text := "-"
+			if mr.Available[i] {
+				text = strings.TrimSpace(fmt.Sprintf("%s %s", formatMetric(mr.Values[i]), mr.Unit))
 			}
-			return formatMetric(m.get(a.Data.ResourceUtilization))
-		})
+			cells = append(cells, runCell(i, text))
+		}
+		if twoWay {
+			deltaText, changeText := "-", "N/A"
+			deltaCell, changeCell := plainCell(deltaText), plainCell(changeText)
+			if mr.Delta != nil {
+				deltaText = fmt.Sprintf("%+.2f", *mr.Delta)
+				deltaCell = coloredCell(deltaText, colorBySign(*mr.Delta, deltaText))
+			}
+			if mr.PctChange != nil {
+				changeText = formatPctChange(*mr.PctChange)
+				changeCell = coloredCell(changeText, colorBySign(*mr.PctChange, changeText))
+			}
+			cells = append(cells, deltaCell, changeCell)
+		}
+		rows = append(rows, cells)
 	}
 	writeTable(w, rows)
 }
