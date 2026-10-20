@@ -160,6 +160,32 @@ func TestGraphModelOverlapAndHide(t *testing.T) {
 	}
 }
 
+func TestGraphModelToggleLimit(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.ANSI)
+	defer lipgloss.SetColorProfile(termenv.Ascii)
+
+	var s aibom.Series
+	s.Window.Start, s.Window.End = 1000, 1060
+	s.Metrics = map[string]aibom.SeriesMetric{
+		"gpu_utilization": {Unit: "percent", Aggregate: [][2]float64{{1000, 10}, {1060, 90}}},
+	}
+	runs := []graphRun{{Name: "r", Series: s, Limits: map[string]float64{"gpu_utilization": 50}}}
+	keys, _ := graphMetricKeys(runs, nil)
+	var m tea.Model = newGraphModel(runs, keys, false)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
+	box := func() string {
+		v := m.View()
+		return v[strings.Index(v, "╭"):strings.Index(v, "╯")]
+	}
+	if !strings.Contains(box(), "\x1b[31m") { // red limit line visible by default
+		t.Fatal("expected red limit line in the panel")
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	if strings.Contains(box(), "\x1b[31m") {
+		t.Fatal("t should hide the red limit line")
+	}
+}
+
 func TestGraphModelQuitBacksOutOfZoom(t *testing.T) {
 	runs := tuiRuns()
 	keys, _ := graphMetricKeys(runs, nil)

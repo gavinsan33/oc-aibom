@@ -24,6 +24,20 @@ const (
 	modeGraph
 )
 
+// navTabs renders the detail/graph page tabs for the embedded browser views,
+// highlighting the active page so d/g read as switching to a separate page
+// rather than acting on the current view. active is "detail" or "graph".
+func navTabs(active string) string {
+	tab := func(key, label, name string) string {
+		s := fmt.Sprintf("[%s] %s", key, label)
+		if name == active {
+			return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(s)
+		}
+		return lipgloss.NewStyle().Faint(true).Render(s)
+	}
+	return " " + tab("d", "Detail view", "detail") + "   " + tab("g", "Graph view", "graph")
+}
+
 const (
 	pageDetail = iota
 	pageCompare
@@ -342,7 +356,8 @@ func (m listModel) pagerFooterH() int {
 	return h
 }
 
-func (m listModel) pagerBodyH() int { return max(1, m.h-1-m.pagerFooterH()) }
+// pagerBodyH reserves a line for the nav tabs, the title, and the footer.
+func (m listModel) pagerBodyH() int { return max(1, m.h-2-m.pagerFooterH()) }
 
 func (m listModel) View() string {
 	switch m.mode {
@@ -405,7 +420,7 @@ func (m listModel) pagerView() string {
 	title := lipgloss.NewStyle().Bold(true).Render(m.pageTitle)
 
 	footer := lipgloss.NewStyle().Faint(true).Render(
-		fmt.Sprintf(" ↑↓ ←→ scroll · g graph · q back · %d-%d/%d", m.pageOff+1, end, len(m.pageLines)))
+		fmt.Sprintf(" ↑↓ ←→ scroll · q back · %d-%d/%d", m.pageOff+1, end, len(m.pageLines)))
 	// The --changed toggle and its state get their own line so the hint is
 	// clear and never pushed off the right edge of a narrow terminal.
 	if m.pageKind == pageCompare {
@@ -420,7 +435,7 @@ func (m listModel) pagerView() string {
 		visible = append(visible, hslice(l, m.hoff, m.w))
 	}
 	// Blank separator between the content and the footer tips.
-	return title + "\n" + strings.Join(visible, "\n") + "\n\n" + footer
+	return navTabs("detail") + "\n" + title + "\n" + strings.Join(visible, "\n") + "\n\n" + footer
 }
 
 // changedIndicator is the bottom-of-screen toggle state for compare's
