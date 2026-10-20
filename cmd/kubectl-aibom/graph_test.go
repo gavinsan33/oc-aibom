@@ -65,6 +65,10 @@ func TestLimitInSeriesUnit(t *testing.T) {
 	if got := limitInSeriesUnit(8, "GiB"); got != 8*(1<<30) {
 		t.Fatalf("GiB: %v", got)
 	}
+	// "GB" is the webhook's older label for the same binary GiB, not decimal 1e9.
+	if got := limitInSeriesUnit(8, "GB"); got != 8*(1<<30) {
+		t.Fatalf("GB: %v", got)
+	}
 	if got := limitInSeriesUnit(50, "MBps"); got != 50e6 {
 		t.Fatalf("MBps: %v", got)
 	}
