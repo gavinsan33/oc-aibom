@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strings"
@@ -33,14 +34,9 @@ func main() {
 	configFlags.AddFlags(root.PersistentFlags())
 	root.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 
-	var allNamespaces bool
-	var modelFilter, intentFilter, quantFilter string
-	var architectureFilter, frameworkFilter, gpuTypeFilter string
-	var jobFilter, gitBranchFilter, gitRepoFilter string
-	var servingEngineFilter, adaptationMethodFilter, optimizerFilter string
-	var driftOnly bool
-	var sortBy string
-	var ascending bool
+	// The no-arg root (interactive) and `list` share the same filter/sort
+	// flags, each with its own copy so cobra can bind them independently.
+	var rootOpts, listOpts listFilterFlags
 	listCmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls", "get"},
@@ -50,64 +46,37 @@ func main() {
 			if err != nil {
 				return err
 			}
-			ns := namespace
-			if allNamespaces {
-				ns = ""
-			}
-			items, err := aibom.List(context.Background(), client, ns)
+			items, err := listOpts.load(context.Background(), client, namespace)
 			if err != nil {
 				return err
 			}
-			items = aibom.Apply(items, aibom.Filter{
-				Model:            modelFilter,
-				Intent:           intentFilter,
-				Quantization:     quantFilter,
-				Architecture:     architectureFilter,
-				Framework:        frameworkFilter,
-				GPUType:          gpuTypeFilter,
-				JobName:          jobFilter,
-				GitBranch:        gitBranchFilter,
-				GitRepository:    gitRepoFilter,
-				ServingEngine:    servingEngineFilter,
-				AdaptationMethod: adaptationMethodFilter,
-				Optimizer:        optimizerFilter,
-			})
-			if driftOnly {
-				items = aibom.DriftOnly(items)
-			}
-			switch sortBy {
-			case "", "age":
-				// Default: List() itself only sorts alphabetically by
-				// namespace/name (kept that way since completeAIBOMNames
-				// also relies on it, for tab-completion), so `list` applies
-				// its own default of oldest-first by age on top of that
-				// unless a different --sort-by metric is requested.
-				aibom.SortByAge(items, ascending)
-			default:
-				if err := aibom.SortByMetric(items, sortBy, ascending); err != nil {
-					return err
-				}
-			}
-			printList(items, allNamespaces, sortBy)
+			printList(items, listOpts.allNamespaces, listOpts.sortBy)
 			return nil
 		},
 	}
-	listCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", false, "list AIBOMs across all namespaces")
-	listCmd.Flags().StringVar(&modelFilter, "model", "", "filter by model.name")
-	listCmd.Flags().StringVar(&intentFilter, "intent", "", "filter by experiment intent (training|sft|inference)")
-	listCmd.Flags().StringVar(&quantFilter, "quantization", "", "filter by model.quantization")
-	listCmd.Flags().StringVar(&architectureFilter, "architecture", "", "filter by model.architecture")
-	listCmd.Flags().StringVar(&frameworkFilter, "framework", "", "filter by model.framework")
-	listCmd.Flags().StringVar(&gpuTypeFilter, "gpu-type", "", "filter by environment.gpu_type")
-	listCmd.Flags().StringVar(&jobFilter, "job", "", "filter by job name")
-	listCmd.Flags().StringVar(&gitBranchFilter, "git-branch", "", "filter by source_code.git_branch")
-	listCmd.Flags().StringVar(&gitRepoFilter, "git-repository", "", "filter by source_code.git_repository")
-	listCmd.Flags().StringVar(&servingEngineFilter, "serving-engine", "", "filter by inference.serving_engine")
-	listCmd.Flags().StringVar(&adaptationMethodFilter, "adaptation-method", "", "filter by fine_tuning.adaptation_method")
-	listCmd.Flags().StringVar(&optimizerFilter, "optimizer", "", "filter by training.optimizer")
-	listCmd.Flags().BoolVar(&driftOnly, "drift-only", false, "only show AIBOMs where auto-detected dataset(s) disagree with the declared dataset")
-	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx); defaults to 'age' (oldest AIBOM first)")
-	listCmd.Flags().BoolVar(&ascending, "ascending", false, "reverse --sort-by order (lowest first; for the default age sort, shows most recently collected first)")
+	listOpts.register(listCmd)
+
+	// With no subcommand, `oc aibom` opens the interactive browser on a
+	// terminal, falling back to the plain `list` output when stdout is piped
+	// or redirected (so `oc aibom | grep` still works). Explicit subcommands
+	// are always print-only.
+	root.Args = cobra.NoArgs
+	root.RunE = func(cmd *cobra.Command, args []string) error {
+		client, namespace, err := buildClient(configFlags)
+		if err != nil {
+			return err
+		}
+		items, err := rootOpts.load(context.Background(), client, namespace)
+		if err != nil {
+			return err
+		}
+		if !term.IsTerminal(int(os.Stdout.Fd())) {
+			printList(items, rootOpts.allNamespaces, rootOpts.sortBy)
+			return nil
+		}
+		return runListTUI(items, client, rootOpts.allNamespaces, rootOpts.sortBy)
+	}
+	rootOpts.register(root)
 
 	var brief bool
 	getCmd := &cobra.Command{
@@ -126,7 +95,7 @@ func main() {
 				return err
 			}
 			verifyResult := aibom.Verify(ctx, client, a)
-			printDescribe(a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief)
+			printDescribe(os.Stdout, a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief)
 			return nil
 		},
 	}
@@ -134,7 +103,7 @@ func main() {
 
 	diffCmd := &cobra.Command{
 		Use:               "diff <name-a> <name-b>",
-		Short:             "Show field-level differences between two AIBOMs",
+		Short:             "Show only the fields that differ between two AIBOMs (compare --changed)",
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: completeAIBOMNames(configFlags, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -142,23 +111,19 @@ func main() {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			a, err := aibom.Get(ctx, client, namespace, args[0])
+			items, err := getAIBOMs(context.Background(), client, namespace, args)
 			if err != nil {
 				return err
 			}
-			b, err := aibom.Get(ctx, client, namespace, args[1])
-			if err != nil {
-				return err
-			}
-			printDiff(args[0], args[1], aibom.Diff(a, b), aibom.DiffPerformance(a, b))
+			printCompare(os.Stdout, items, true)
 			return nil
 		},
 	}
 
+	var compareChanged bool
 	compareCmd := &cobra.Command{
 		Use:               "compare <name> <name> [<name>...]",
-		Short:             "Show performance metrics for two or more AIBOMs side by side",
+		Short:             "Compare two or more AIBOMs field by field, with performance side by side",
 		Args:              cobra.MinimumNArgs(2),
 		ValidArgsFunction: completeAIBOMNames(configFlags, 0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -166,19 +131,15 @@ func main() {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			items := make([]aibom.AIBOM, 0, len(args))
-			for _, name := range args {
-				a, err := aibom.Get(ctx, client, namespace, name)
-				if err != nil {
-					return err
-				}
-				items = append(items, a)
+			items, err := getAIBOMs(context.Background(), client, namespace, args)
+			if err != nil {
+				return err
 			}
-			printCompare(items)
+			printCompare(os.Stdout, items, compareChanged)
 			return nil
 		},
 	}
+	compareCmd.Flags().BoolVar(&compareChanged, "changed", false, "show only the fields that differ across the compared AIBOMs")
 
 	var graphMetrics []string
 	var graphPods bool
@@ -195,35 +156,11 @@ func main() {
 				return err
 			}
 			ctx := context.Background()
-			var runs []graphRun
-			var notes []string
-			for _, name := range args {
-				a, err := aibom.Get(ctx, client, namespace, name)
-				if err != nil {
-					return err
-				}
-				sr := aibom.VerifySeries(ctx, client, a, aibom.Verify(ctx, client, a))
-				if sr.Status == aibom.SeriesMismatch {
-					notes = append(notes, fmt.Sprintf("%s: not charted, telemetry series %s", name, formatSeriesVerify(sr)))
-					continue
-				}
-				s, err := aibom.LoadSeries(ctx, client, a)
-				if err != nil {
-					notes = append(notes, fmt.Sprintf("%s: left out, %v", name, err))
-					continue
-				}
-				notes = append(notes, fmt.Sprintf("%s: telemetry series %s", name, formatSeriesVerify(sr)))
-				limits := map[string]float64{}
-				if a.Data.ResourceUtilization.Metrics != nil {
-					for k, m := range a.Data.ResourceUtilization.Metrics {
-						// The series is in raw base units; the stored limit is in display units.
-						if m.Limit != nil && *m.Limit > 0 {
-							limits[k] = limitInSeriesUnit(*m.Limit, m.Unit)
-						}
-					}
-				}
-				runs = append(runs, graphRun{Name: name, Series: s, Limits: limits})
+			items, err := getAIBOMs(ctx, client, namespace, args)
+			if err != nil {
+				return err
 			}
+			runs, notes := buildGraphRuns(ctx, client, items)
 			printNotes := func() { fmt.Fprintln(os.Stderr, strings.Join(notes, "\n")) }
 			if len(runs) == 0 {
 				printNotes()
@@ -313,6 +250,77 @@ func buildClient(configFlags *genericclioptions.ConfigFlags) (dynamic.Interface,
 	return client, namespace, nil
 }
 
+// getAIBOMs fetches the named AIBOMs in order, failing on the first missing
+// one (shared by compare, diff, and graph).
+func getAIBOMs(ctx context.Context, client dynamic.Interface, namespace string, names []string) ([]aibom.AIBOM, error) {
+	items := make([]aibom.AIBOM, 0, len(names))
+	for _, name := range names {
+		a, err := aibom.Get(ctx, client, namespace, name)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, a)
+	}
+	return items, nil
+}
+
+// listFilterFlags is the filter/sort state shared by the `list` subcommand
+// and the no-arg interactive root, registered on each via register.
+type listFilterFlags struct {
+	allNamespaces bool
+	driftOnly     bool
+	ascending     bool
+	sortBy        string
+	f             aibom.Filter
+}
+
+func (o *listFilterFlags) register(cmd *cobra.Command) {
+	fl := cmd.Flags()
+	fl.BoolVarP(&o.allNamespaces, "all-namespaces", "A", false, "list AIBOMs across all namespaces")
+	fl.StringVar(&o.f.Model, "model", "", "filter by model.name")
+	fl.StringVar(&o.f.Intent, "intent", "", "filter by experiment intent (training|sft|inference)")
+	fl.StringVar(&o.f.Quantization, "quantization", "", "filter by model.quantization")
+	fl.StringVar(&o.f.Architecture, "architecture", "", "filter by model.architecture")
+	fl.StringVar(&o.f.Framework, "framework", "", "filter by model.framework")
+	fl.StringVar(&o.f.GPUType, "gpu-type", "", "filter by environment.gpu_type")
+	fl.StringVar(&o.f.JobName, "job", "", "filter by job name")
+	fl.StringVar(&o.f.GitBranch, "git-branch", "", "filter by source_code.git_branch")
+	fl.StringVar(&o.f.GitRepository, "git-repository", "", "filter by source_code.git_repository")
+	fl.StringVar(&o.f.ServingEngine, "serving-engine", "", "filter by inference.serving_engine")
+	fl.StringVar(&o.f.AdaptationMethod, "adaptation-method", "", "filter by fine_tuning.adaptation_method")
+	fl.StringVar(&o.f.Optimizer, "optimizer", "", "filter by training.optimizer")
+	fl.BoolVar(&o.driftOnly, "drift-only", false, "only show AIBOMs where auto-detected dataset(s) disagree with the declared dataset")
+	fl.StringVar(&o.sortBy, "sort-by", "", "rank by a performance metric (gpu-utilization, gpu-memory, gpu-power, cpu-usage, memory-usage, network-rx, network-tx); defaults to 'age' (oldest AIBOM first)")
+	fl.BoolVar(&o.ascending, "ascending", false, "reverse --sort-by order (lowest first; for the default age sort, shows most recently collected first)")
+}
+
+// load fetches, filters, and sorts AIBOMs per the flags. The default sort is
+// oldest-first by age (List itself only sorts by namespace/name, which
+// completeAIBOMNames relies on for tab-completion).
+func (o *listFilterFlags) load(ctx context.Context, client dynamic.Interface, namespace string) ([]aibom.AIBOM, error) {
+	ns := namespace
+	if o.allNamespaces {
+		ns = ""
+	}
+	items, err := aibom.List(ctx, client, ns)
+	if err != nil {
+		return nil, err
+	}
+	items = aibom.Apply(items, o.f)
+	if o.driftOnly {
+		items = aibom.DriftOnly(items)
+	}
+	switch o.sortBy {
+	case "", "age":
+		aibom.SortByAge(items, o.ascending)
+	default:
+		if err := aibom.SortByMetric(items, o.sortBy, o.ascending); err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
+}
+
 // metricLabels are the display headers for aibom.SortableMetrics keys.
 var metricLabels = map[string]string{
 	"gpu-utilization": "GPU UTIL %",
@@ -374,6 +382,15 @@ func formatSegment(v *float64) string {
 }
 
 func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
+	writeTable(os.Stdout, listRows(items, allNamespaces, sortBy))
+	if len(items) == 0 {
+		fmt.Println("No AIBOMs found.")
+	}
+}
+
+// listRows builds the `list` table (header row first) as [][]cell, so both
+// printList and the interactive browser render identical columns.
+func listRows(items []aibom.AIBOM, allNamespaces bool, sortBy string) [][]cell {
 	metricHeader, metricGet := "", aibom.SortableMetrics[sortBy]
 	if sortBy != "" && sortBy != "age" {
 		metricHeader = metricLabels[sortBy]
@@ -403,10 +420,7 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 		}
 		rows = append(rows, row)
 	}
-	writeTable(os.Stdout, rows)
-	if len(items) == 0 {
-		fmt.Println("No AIBOMs found.")
-	}
+	return rows
 }
 
 // humanAge renders the time elapsed since collectedAt (an RFC3339
@@ -523,58 +537,58 @@ func formatSeriesVerify(r aibom.SeriesResult) string {
 	}
 }
 
-func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief bool) {
-	fmt.Printf("Name:              %s\n", a.Name)
-	fmt.Printf("Namespace:         %s\n", a.Namespace)
-	fmt.Printf("Job:               %s\n", a.JobName)
+func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief bool) {
+	fmt.Fprintf(w, "Name:              %s\n", a.Name)
+	fmt.Fprintf(w, "Namespace:         %s\n", a.Namespace)
+	fmt.Fprintf(w, "Job:               %s\n", a.JobName)
 	if a.Data.ExperimentName != "" && a.Data.ExperimentName != a.JobName {
-		fmt.Printf("Experiment:        %s\n", a.Data.ExperimentName)
+		fmt.Fprintf(w, "Experiment:        %s\n", a.Data.ExperimentName)
 	}
 	if a.Data.ExperimentDescription != "" {
-		fmt.Printf("Description:       %s\n", a.Data.ExperimentDescription)
+		fmt.Fprintf(w, "Description:       %s\n", a.Data.ExperimentDescription)
 	}
 	if via := a.Data.ExperimentIntentDeclaredVia; via != "" {
-		fmt.Printf("Experiment Intent: %s (via: %s)\n", a.ExperimentIntent, via)
+		fmt.Fprintf(w, "Experiment Intent: %s (via: %s)\n", a.ExperimentIntent, via)
 	} else {
-		fmt.Printf("Experiment Intent: %s\n", a.ExperimentIntent)
+		fmt.Fprintf(w, "Experiment Intent: %s\n", a.ExperimentIntent)
 	}
-	fmt.Printf("Runtime:           %s (%s -> %s)\n",
+	fmt.Fprintf(w, "Runtime:           %s (%s -> %s)\n",
 		a.Data.ExecutionMetadata.Duration(),
 		a.Data.ExecutionMetadata.EarliestPodStart(),
 		a.CollectedAt,
 	)
-	fmt.Printf("Status:            %s\n", formatPodStatus(a.Data.ExecutionMetadata.Status, nil))
-	fmt.Printf("Signature:         %s\n", formatVerify(verifyResult))
+	fmt.Fprintf(w, "Status:            %s\n", formatPodStatus(a.Data.ExecutionMetadata.Status, nil))
+	fmt.Fprintf(w, "Signature:         %s\n", formatVerify(verifyResult))
 	if seriesResult.Status != aibom.SeriesAbsent {
-		fmt.Printf("Telemetry Series:  %s\n", formatSeriesVerify(seriesResult))
+		fmt.Fprintf(w, "Telemetry Series:  %s\n", formatSeriesVerify(seriesResult))
 	}
-	fmt.Println()
-	fmt.Println(bold("Model:"))
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold("Model:"))
 	if via := a.Data.Model.NameDeclaredVia; via != "" {
-		fmt.Printf("  Name:          %s (via: %s)\n", a.Data.Model.Name, via)
+		fmt.Fprintf(w, "  Name:          %s (via: %s)\n", a.Data.Model.Name, via)
 	} else {
-		fmt.Printf("  Name:          %s\n", a.Data.Model.Name)
+		fmt.Fprintf(w, "  Name:          %s\n", a.Data.Model.Name)
 	}
-	fmt.Printf("  Version:       %s\n", a.Data.Model.Version)
+	fmt.Fprintf(w, "  Version:       %s\n", a.Data.Model.Version)
 	if a.Data.Model.Revision != "" {
-		fmt.Printf("  Revision:      %s\n", a.Data.Model.Revision)
+		fmt.Fprintf(w, "  Revision:      %s\n", a.Data.Model.Revision)
 	}
 	if a.Data.Model.BaseModel != "" {
-		fmt.Printf("  Base Model:    %s\n", a.Data.Model.BaseModel)
+		fmt.Fprintf(w, "  Base Model:    %s\n", a.Data.Model.BaseModel)
 	}
 	if a.Data.Model.SizeBytes > 0 {
-		fmt.Printf("  Size:          %.1f GB\n", float64(a.Data.Model.SizeBytes)/1e9)
+		fmt.Fprintf(w, "  Size:          %.1f GB\n", float64(a.Data.Model.SizeBytes)/1e9)
 	}
-	fmt.Printf("  Architecture:  %s\n", a.Data.Model.Architecture)
-	fmt.Printf("  Framework:     %s\n", a.Data.Model.Framework)
-	fmt.Printf("  Dtype:         %s\n", a.Data.Model.Dtype)
-	fmt.Printf("  Quantization:  %s (%d-bit)\n", a.Data.Model.Quantization, a.Data.Model.QuantizationBits)
+	fmt.Fprintf(w, "  Architecture:  %s\n", a.Data.Model.Architecture)
+	fmt.Fprintf(w, "  Framework:     %s\n", a.Data.Model.Framework)
+	fmt.Fprintf(w, "  Dtype:         %s\n", a.Data.Model.Dtype)
+	fmt.Fprintf(w, "  Quantization:  %s (%d-bit)\n", a.Data.Model.Quantization, a.Data.Model.QuantizationBits)
 	if sd := a.Data.Model.SpeculativeDecoding; sd != nil {
-		fmt.Printf("  Speculative Decoding: %s (draft: %s, tokens: %d)\n", boolStr(sd.Enabled), sd.DraftModel, sd.NumSpeculativeTokens)
+		fmt.Fprintf(w, "  Speculative Decoding: %s (draft: %s, tokens: %d)\n", boolStr(sd.Enabled), sd.DraftModel, sd.NumSpeculativeTokens)
 	}
-	fmt.Println()
-	fmt.Println(bold("Dataset:"))
-	fmt.Printf("  Declared:      %s %s (license: %s, via: %s)\n",
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold("Dataset:"))
+	fmt.Fprintf(w, "  Declared:      %s %s (license: %s, via: %s)\n",
 		a.Data.Dataset.Declared.Name, a.Data.Dataset.Declared.Version,
 		a.Data.Dataset.Declared.License, a.Data.Dataset.Declared.DeclaredVia)
 	for _, d := range a.Data.Dataset.AutoDetected {
@@ -582,46 +596,46 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 		if !d.MatchesDeclared {
 			match = red("DOES NOT MATCH DECLARED")
 		}
-		fmt.Printf("  Auto-detected: %s %s (license: %s, seen via: %s) — %s\n", d.DatasetName, d.Version, d.License, strings.Join(d.SeenVia, ", "), match)
+		fmt.Fprintf(w, "  Auto-detected: %s %s (license: %s, seen via: %s) — %s\n", d.DatasetName, d.Version, d.License, strings.Join(d.SeenVia, ", "), match)
 	}
-	fmt.Println()
-	fmt.Println(bold("Source:"))
-	fmt.Printf("  Repository:    %s\n", a.Data.SourceCode.GitRepository)
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold("Source:"))
+	fmt.Fprintf(w, "  Repository:    %s\n", a.Data.SourceCode.GitRepository)
 	dirty := fmt.Sprintf("%v", a.Data.SourceCode.Dirty)
 	if a.Data.SourceCode.Dirty {
 		dirty = yellow(dirty)
 	}
-	fmt.Printf("  Commit:        %s (branch: %s, dirty: %s, via: %s)\n",
+	fmt.Fprintf(w, "  Commit:        %s (branch: %s, dirty: %s, via: %s)\n",
 		a.Data.SourceCode.GitCommit, a.Data.SourceCode.GitBranch, dirty, a.Data.SourceCode.DeclaredVia)
 
 	if t := a.Data.Training; t != nil {
-		fmt.Println()
-		fmt.Println(bold("Training:"))
-		fmt.Printf("  Optimizer:              %s\n", t.Optimizer)
-		fmt.Printf("  Learning Rate:          %v\n", t.LearningRate)
-		fmt.Printf("  Batch Size:             %v\n", t.BatchSize)
-		fmt.Printf("  Epochs:                 %v\n", t.Epochs)
-		fmt.Printf("  Random Seed:            %v\n", t.RandomSeed)
-		fmt.Printf("  Parallelization:        %s\n", t.ParallelizationStrategy)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Training:"))
+		fmt.Fprintf(w, "  Optimizer:              %s\n", t.Optimizer)
+		fmt.Fprintf(w, "  Learning Rate:          %v\n", t.LearningRate)
+		fmt.Fprintf(w, "  Batch Size:             %v\n", t.BatchSize)
+		fmt.Fprintf(w, "  Epochs:                 %v\n", t.Epochs)
+		fmt.Fprintf(w, "  Random Seed:            %v\n", t.RandomSeed)
+		fmt.Fprintf(w, "  Parallelization:        %s\n", t.ParallelizationStrategy)
 	}
 	if ft := a.Data.FineTuning; ft != nil {
-		fmt.Println()
-		fmt.Println(bold("Fine-Tuning:"))
-		fmt.Printf("  Adaptation Method: %s\n", ft.AdaptationMethod)
-		fmt.Printf("  LoRA Rank/Alpha:   %v / %v\n", ft.LoRARank, ft.LoRAAlpha)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Fine-Tuning:"))
+		fmt.Fprintf(w, "  Adaptation Method: %s\n", ft.AdaptationMethod)
+		fmt.Fprintf(w, "  LoRA Rank/Alpha:   %v / %v\n", ft.LoRARank, ft.LoRAAlpha)
 	}
 	if inf := a.Data.Inference; inf != nil {
-		fmt.Println()
-		fmt.Println(bold("Inference:"))
-		fmt.Printf("  Serving Engine:       %s\n", inf.ServingEngine)
-		fmt.Printf("  Max Model Len:        %v\n", inf.MaxModelLen)
-		fmt.Printf("  Tensor/Pipeline/Data Parallel: %v / %v / %v\n", inf.TensorParallelSize, inf.PipelineParallelSize, inf.DataParallelSize)
-		fmt.Printf("  Expert Parallel:      %s\n", boolStr(inf.EnableExpertParallel))
-		fmt.Printf("  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
-		fmt.Printf("  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
-		fmt.Printf("  Max Tokens:           %d\n", inf.MaxTokens)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Inference:"))
+		fmt.Fprintf(w, "  Serving Engine:       %s\n", inf.ServingEngine)
+		fmt.Fprintf(w, "  Max Model Len:        %v\n", inf.MaxModelLen)
+		fmt.Fprintf(w, "  Tensor/Pipeline/Data Parallel: %v / %v / %v\n", inf.TensorParallelSize, inf.PipelineParallelSize, inf.DataParallelSize)
+		fmt.Fprintf(w, "  Expert Parallel:      %s\n", boolStr(inf.EnableExpertParallel))
+		fmt.Fprintf(w, "  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
+		fmt.Fprintf(w, "  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
+		fmt.Fprintf(w, "  Max Tokens:           %d\n", inf.MaxTokens)
 		if inf.ServedModelName != "" {
-			fmt.Printf("  Served Model Name:    %s\n", inf.ServedModelName)
+			fmt.Fprintf(w, "  Served Model Name:    %s\n", inf.ServedModelName)
 		}
 		for _, o := range []struct {
 			label string
@@ -632,52 +646,52 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 			{"Prefix Caching", inf.EnablePrefixCaching},
 		} {
 			if o.v != nil {
-				fmt.Printf("  %-21s %v\n", o.label+":", o.v)
+				fmt.Fprintf(w, "  %-21s %v\n", o.label+":", o.v)
 			}
 		}
 		if perf := inf.Performance; perf != nil && len(perf.Metrics) > 0 {
-			printMetricsSection("Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, brief)
+			printMetricsSection(w, "Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, brief)
 		}
 	}
 
-	fmt.Println()
-	fmt.Println("Environment:")
-	fmt.Printf("  GPU:           %s x%d\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount)
-	fmt.Printf("  CPU:           %s x%d\n", a.Data.Environment.CPUModel, a.Data.Environment.CPUCores)
-	fmt.Printf("  Memory:        %.2f GB (%d NUMA node(s))\n", a.Data.Environment.MemoryGB, a.Data.Environment.NUMANodes)
-	fmt.Printf("  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
-	fmt.Printf("  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
-	fmt.Printf("  Kernel:        %s\n", a.Data.Environment.KernelVersion)
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Environment:")
+	fmt.Fprintf(w, "  GPU:           %s x%d\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount)
+	fmt.Fprintf(w, "  CPU:           %s x%d\n", a.Data.Environment.CPUModel, a.Data.Environment.CPUCores)
+	fmt.Fprintf(w, "  Memory:        %.2f GB (%d NUMA node(s))\n", a.Data.Environment.MemoryGB, a.Data.Environment.NUMANodes)
+	fmt.Fprintf(w, "  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
+	fmt.Fprintf(w, "  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
+	fmt.Fprintf(w, "  Kernel:        %s\n", a.Data.Environment.KernelVersion)
 	for _, l := range environmentExtras(a.Data.Environment) {
-		fmt.Printf("  %-14s %s\n", l[0]+":", l[1])
+		fmt.Fprintf(w, "  %-14s %s\n", l[0]+":", l[1])
 	}
 
 	if !brief {
-		fmt.Println()
-		fmt.Println(bold("Pods:"))
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Pods:"))
 		for _, p := range a.Data.ExecutionMetadata.Pods {
-			fmt.Printf("  %s  node=%s  ip=%s  start=%s  status=%s\n",
+			fmt.Fprintf(w, "  %s  node=%s  ip=%s  start=%s  status=%s\n",
 				p.PodName, p.NodeName, p.PodIP, p.StartTime, formatPodStatus(p.Status, p.ExitCode))
 		}
 	}
 
 	ru := a.Data.ResourceUtilization
 	if ru.Note != "" {
-		fmt.Println()
-		fmt.Println(bold("Hardware Performance:"))
-		fmt.Printf("  %s\n", ru.Note)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Hardware Performance:"))
+		fmt.Fprintf(w, "  %s\n", ru.Note)
 	} else {
-		printMetricsSection("Hardware Performance", ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, brief)
+		printMetricsSection(w, "Hardware Performance", ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, brief)
 	}
 
 	if !brief {
-		fmt.Println()
-		fmt.Println(bold("AIBOM Metadata:"))
-		fmt.Printf("  Version:            %s\n", a.Data.Metadata.AIBOMVersion)
-		fmt.Printf("  Generated At:       %s\n", a.Data.Metadata.GeneratedAt)
-		fmt.Printf("  Generator:          %s\n", a.Data.Metadata.Generator)
-		fmt.Printf("  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
-		fmt.Printf("  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("AIBOM Metadata:"))
+		fmt.Fprintf(w, "  Version:            %s\n", a.Data.Metadata.AIBOMVersion)
+		fmt.Fprintf(w, "  Generated At:       %s\n", a.Data.Metadata.GeneratedAt)
+		fmt.Fprintf(w, "  Generator:          %s\n", a.Data.Metadata.Generator)
+		fmt.Fprintf(w, "  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
+		fmt.Fprintf(w, "  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
 	}
 }
 
@@ -696,7 +710,7 @@ func boolStr(b bool) string {
 // metrics) and InferencePerformance (vLLM's own serving metrics) share this
 // rendering despite having different known metric-name sets -- see
 // telemetryMetricOrder/telemetryMetricLabels vs. vllmMetricOrder/vllmMetricLabels.
-func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, labels map[string]string) {
+func printMetricDetail(w io.Writer, metrics map[string]aibom.MetricStats, order []string, labels map[string]string) {
 	if len(metrics) == 0 {
 		return
 	}
@@ -721,7 +735,7 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 			plainCell(segmentsText),
 		})
 	}
-	writeTable(os.Stdout, rows)
+	writeTable(w, rows)
 }
 
 // printMetricsSection prints one metrics section -- shared by
@@ -732,23 +746,23 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 // table is skipped, so the average is the only view of each metric). In
 // full mode the average-only line is redundant with the detail table's AVG
 // column, so it's omitted there and the detail table is printed instead.
-func printMetricsSection(title string, metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, brief bool) {
-	fmt.Println()
-	fmt.Println(bold(title + ":"))
+func printMetricsSection(w io.Writer, title string, metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, brief bool) {
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold(title+":"))
 	if brief {
 		for _, key := range order {
 			m, ok := metrics[key]
 			if !ok {
 				continue
 			}
-			fmt.Printf("  %-16s %.2f %s\n", labels[key]+":", m.Avg, m.Unit)
+			fmt.Fprintf(w, "  %-16s %.2f %s\n", labels[key]+":", m.Avg, m.Unit)
 		}
 	}
 	if includesColdStart {
-		fmt.Println("  (includes cold start)")
+		fmt.Fprintln(w, "  (includes cold start)")
 	}
 	if !brief {
-		printMetricDetail(metrics, order, labels)
+		printMetricDetail(w, metrics, order, labels)
 	}
 }
 
@@ -783,86 +797,83 @@ func maxCell(max float64, limit *float64) cell {
 	}
 }
 
-func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.MetricDiff) {
-	if len(diffs) == 0 {
-		fmt.Printf("No differences found between %s and %s (across compared config/metadata fields).\n", nameA, nameB)
-	} else {
-		rows := [][]cell{{labelHeaderCell("FIELD"), runHeaderCell(0, nameA), runHeaderCell(1, nameB)}}
-		for _, d := range diffs {
-			rows = append(rows, []cell{labelCell(d.Field), plainCell(d.A), plainCell(d.B)})
-		}
-		writeTable(os.Stdout, rows)
-	}
-
-	fmt.Println()
-	fmt.Println(bold("Performance:"))
-	rows := [][]cell{{
-		labelHeaderCell("METRIC"), runHeaderCell(0, nameA), runHeaderCell(1, nameB),
-		coloredCell("DELTA", bold("DELTA")), coloredCell("CHANGE", bold("CHANGE")),
-	}}
-	for _, m := range metrics {
-		deltaText := fmt.Sprintf("%+.2f", m.Delta)
-		changeText := formatPctChange(m.PctChange)
-		rows = append(rows, []cell{
-			labelCell(m.Metric),
-			plainCell(formatMetric(m.A)),
-			plainCell(formatMetric(m.B)),
-			coloredCell(deltaText, colorBySign(m.Delta, deltaText)),
-			coloredCell(changeText, colorBySign(m.PctChange, changeText)),
-		})
-	}
-	writeTable(os.Stdout, rows)
-}
-
-func printCompare(items []aibom.AIBOM) {
-	header := make([]cell, len(items)+1)
-	header[0] = labelHeaderCell("FIELD")
-	for i, a := range items {
-		header[i+1] = runHeaderCell(i, a.Name)
-	}
-	rows := [][]cell{header}
-
-	row := func(label string, values func(aibom.AIBOM) string) {
-		cells := make([]cell, len(items)+1)
-		cells[0] = labelCell(label)
+// printCompare renders the console plugin's compare Overview: a Fields table
+// (every compared field, one column per run, differing fields flagged) and a
+// Hardware Performance table (one column per run, plus Delta/Change columns
+// when exactly two runs are compared). With changedOnly, unchanged field rows
+// are hidden -- this is what `diff` (a two-run compare --changed) uses.
+func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
+	runHeader := func(label string, extra ...cell) [][]cell {
+		h := make([]cell, 0, len(items)+1+len(extra))
+		h = append(h, labelHeaderCell(label))
 		for i, a := range items {
-			cells[i+1] = runCell(i, values(a))
+			h = append(h, runHeaderCell(i, a.Name))
+		}
+		return [][]cell{append(h, extra...)}
+	}
+
+	fmt.Fprintln(w, bold("Fields:"))
+	rows := runHeader("FIELD")
+	anyDiff := false
+	for _, fr := range aibom.CompareFields(items) {
+		if changedOnly && !fr.Differs {
+			continue
+		}
+		label := labelCell(fr.Label)
+		if fr.Differs {
+			anyDiff = true
+			marked := fr.Label + " *" // visible even with color disabled
+			label = coloredCell(marked, colorize(ansiLightCyan, marked))
+		}
+		cells := []cell{label}
+		for i, v := range fr.Values {
+			if v == "" {
+				v = "-"
+			}
+			cells = append(cells, runCell(i, v))
 		}
 		rows = append(rows, cells)
 	}
-
-	row("Model", func(a aibom.AIBOM) string { return a.Data.Model.Name })
-	row("Quantization", func(a aibom.AIBOM) string { return a.Data.Model.Quantization })
-	row("Intent", func(a aibom.AIBOM) string { return a.ExperimentIntent })
-	row("GPU Type", func(a aibom.AIBOM) string { return a.Data.Environment.GPUType })
-	writeTable(os.Stdout, rows)
-	fmt.Println()
-
-	fmt.Println(bold("Performance:"))
-	metricHeader := make([]cell, len(items)+1)
-	metricHeader[0] = labelHeaderCell("METRIC")
-	for i, a := range items {
-		metricHeader[i+1] = runHeaderCell(i, a.Name)
+	if len(rows) == 1 {
+		fmt.Fprintln(w, "  (no differing fields)")
+	} else {
+		writeTable(w, rows)
 	}
-	rows = [][]cell{metricHeader}
-	for _, m := range []struct {
-		label string
-		get   func(aibom.ResourceUtilization) float64
-	}{
-		{"GPU Utilization %", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_utilization") }},
-		{"GPU Memory (MiB)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_memory_used") }},
-		{"GPU Power (W)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("gpu_power") }},
-		{"CPU Usage (cores)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("cpu_usage") }},
-		{"Memory Usage (GB)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("memory_usage") }},
-		{"Network RX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("network_receive") }},
-		{"Network TX (Mbps)", func(r aibom.ResourceUtilization) float64 { return r.MetricAvg("network_transmit") }},
-	} {
-		row(m.label, func(a aibom.AIBOM) string {
-			if a.Data.ResourceUtilization.Note != "" {
-				return "-"
+	if anyDiff {
+		fmt.Fprintln(w, faint("  * field differs across runs"))
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold("Hardware Performance:"))
+	twoWay := len(items) == 2
+	var extra []cell
+	if twoWay {
+		extra = []cell{coloredCell("DELTA", bold("DELTA")), coloredCell("CHANGE", bold("CHANGE"))}
+	}
+	rows = runHeader("METRIC", extra...)
+	for _, mr := range aibom.ComparePerformance(items, telemetryMetricOrder) {
+		cells := []cell{labelCell(telemetryMetricLabels[mr.Key])}
+		for i := range items {
+			text := "-"
+			if mr.Available[i] {
+				text = strings.TrimSpace(fmt.Sprintf("%s %s", formatMetric(mr.Values[i]), mr.Unit))
 			}
-			return formatMetric(m.get(a.Data.ResourceUtilization))
-		})
+			cells = append(cells, runCell(i, text))
+		}
+		if twoWay {
+			deltaText, changeText := "-", "N/A"
+			deltaCell, changeCell := plainCell(deltaText), plainCell(changeText)
+			if mr.Delta != nil {
+				deltaText = fmt.Sprintf("%+.2f", *mr.Delta)
+				deltaCell = coloredCell(deltaText, colorBySign(*mr.Delta, deltaText))
+			}
+			if mr.PctChange != nil {
+				changeText = formatPctChange(*mr.PctChange)
+				changeCell = coloredCell(changeText, colorBySign(*mr.PctChange, changeText))
+			}
+			cells = append(cells, deltaCell, changeCell)
+		}
+		rows = append(rows, cells)
 	}
-	writeTable(os.Stdout, rows)
+	writeTable(w, rows)
 }

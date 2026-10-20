@@ -25,6 +25,7 @@ type graphModel struct {
 	w, h      int
 	sharedMax int64
 	hidden    map[int]bool // run index -> hidden via 1-9
+	embedded  bool         // hosted inside the browser: offer "d detail", back vs quit
 }
 
 func newGraphModel(runs []graphRun, metrics []string, pods bool) graphModel {
@@ -327,7 +328,13 @@ func (m graphModel) View() string {
 	header := lipgloss.NewStyle().Bold(true).Render("oc aibom graph") + "  " + strings.Join(legend, "  ") +
 		lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("   0 → %s elapsed", fmtElapsed(m.sharedMax)))
 	stats := m.statsLines()
-	helpText := " ←↑↓→ select · enter zoom · p per-pod/GPU · 1-9 hide/show run · q quit"
+	exit := "q quit"
+	detail := ""
+	if m.embedded {
+		exit = "q back"
+		detail = "d detail · "
+	}
+	helpText := " ←↑↓→ select · enter zoom · p per-pod/GPU · 1-9 hide/show run · " + detail + exit
 	if m.zoom {
 		helpText = " ←↑↓→ select · enter/q back · p per-pod/GPU · 1-9 hide/show run · ctrl+c quit"
 	}

@@ -13,12 +13,14 @@ import (
 const (
 	ansiReset     = "\x1b[0m"
 	ansiBold      = "\x1b[1m"
+	ansiFaint     = "\x1b[2m"
 	ansiRed       = "\x1b[31m"
 	ansiGreen     = "\x1b[32m"
 	ansiYellow    = "\x1b[33m"
 	ansiBlue      = "\x1b[34m"
 	ansiMagenta   = "\x1b[35m"
 	ansiCyan      = "\x1b[36m"
+	ansiLightCyan = "\x1b[96m"
 	ansiDefaultFG = "\x1b[39m"
 )
 
@@ -63,8 +65,9 @@ func boldColorize(code, s string) string {
 	return ansiBold + code + s + ansiReset
 }
 
-func bold(s string) string { return colorize(ansiBold, s) }
-func cyan(s string) string { return colorize(ansiCyan, s) }
+func bold(s string) string  { return colorize(ansiBold, s) }
+func cyan(s string) string  { return colorize(ansiCyan, s) }
+func faint(s string) string { return colorize(ansiFaint, s) }
 
 // colorBySign colorizes s green/red/default-fg depending on the sign of v.
 func colorBySign(v float64, s string) string {

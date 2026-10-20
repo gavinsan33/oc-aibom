@@ -193,18 +193,19 @@ oc aibom graph run1 run2 --pods
 oc aibom graph run1 run2 --text --width 100
 ```
 
-### `oc aibom diff <name-a> <name-b>`
-
-Field-by-field comparison of two AIBOMs: model config, dataset
-declaration/drift, git provenance, and hardware/driver environment, plus a
-quantified performance table (value, delta, and percent change) across GPU
-utilization/memory/power, CPU/memory usage, and network throughput.
-
 ### `oc aibom compare <name> <name> [<name>...]`
 
-Side-by-side performance table across two or more AIBOMs — one column per
-run — for spotting trends across a run history rather than just a single
-pairwise diff.
+Side-by-side comparison of two or more AIBOMs, mirroring the console plugin's
+compare view: a Fields table (model config, dataset declaration/drift, git
+provenance, hardware/driver environment, AIBOM version — one column per run,
+with differing fields marked `*`) and a Hardware Performance table (one column
+per run, plus delta/percent-change columns when exactly two are compared).
+Pass `--changed` to show only the fields that differ.
+
+### `oc aibom diff <name-a> <name-b>`
+
+Convenience alias for `compare <name-a> <name-b> --changed` — the same tables,
+with the Fields table reduced to just what differs between the two runs.
 
 ## Standard flags
 

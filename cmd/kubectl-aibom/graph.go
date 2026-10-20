@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"k8s.io/client-go/dynamic"
 
 	"github.com/gsanders/oc-aibom/internal/aibom"
 )
@@ -151,6 +154,35 @@ func graphMetricLabel(k string) string {
 		return l
 	}
 	return k
+}
+
+// buildGraphRuns loads each AIBOM's verified telemetry series into graphRuns,
+// skipping any whose series is missing or fails digest verification, and
+// returns one human-readable note per AIBOM describing what happened (shared
+// by the `graph` command and the interactive browser's graph view).
+func buildGraphRuns(ctx context.Context, client dynamic.Interface, items []aibom.AIBOM) (runs []graphRun, notes []string) {
+	for _, a := range items {
+		sr := aibom.VerifySeries(ctx, client, a, aibom.Verify(ctx, client, a))
+		if sr.Status == aibom.SeriesMismatch {
+			notes = append(notes, fmt.Sprintf("%s: not charted, telemetry series %s", a.Name, formatSeriesVerify(sr)))
+			continue
+		}
+		s, err := aibom.LoadSeries(ctx, client, a)
+		if err != nil {
+			notes = append(notes, fmt.Sprintf("%s: left out, %v", a.Name, err))
+			continue
+		}
+		notes = append(notes, fmt.Sprintf("%s: telemetry series %s", a.Name, formatSeriesVerify(sr)))
+		// The series is in raw base units; the stored limit is in display units.
+		limits := map[string]float64{}
+		for k, m := range a.Data.ResourceUtilization.Metrics {
+			if m.Limit != nil && *m.Limit > 0 {
+				limits[k] = limitInSeriesUnit(*m.Limit, m.Unit)
+			}
+		}
+		runs = append(runs, graphRun{Name: a.Name, Series: s, Limits: limits})
+	}
+	return runs, notes
 }
 
 // graphRun is one AIBOM's loaded series, in the order given on the command
