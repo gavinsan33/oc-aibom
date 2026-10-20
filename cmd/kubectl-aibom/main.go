@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strings"
@@ -126,7 +127,7 @@ func main() {
 				return err
 			}
 			verifyResult := aibom.Verify(ctx, client, a)
-			printDescribe(a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief)
+			printDescribe(os.Stdout, a, verifyResult, aibom.VerifySeries(ctx, client, a, verifyResult), brief)
 			return nil
 		},
 	}
@@ -175,7 +176,7 @@ func main() {
 				}
 				items = append(items, a)
 			}
-			printCompare(items)
+			printCompare(os.Stdout, items)
 			return nil
 		},
 	}
@@ -374,6 +375,15 @@ func formatSegment(v *float64) string {
 }
 
 func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
+	writeTable(os.Stdout, listRows(items, allNamespaces, sortBy))
+	if len(items) == 0 {
+		fmt.Println("No AIBOMs found.")
+	}
+}
+
+// listRows builds the `list` table (header row first) as [][]cell, so both
+// printList and the interactive browser render identical columns.
+func listRows(items []aibom.AIBOM, allNamespaces bool, sortBy string) [][]cell {
 	metricHeader, metricGet := "", aibom.SortableMetrics[sortBy]
 	if sortBy != "" && sortBy != "age" {
 		metricHeader = metricLabels[sortBy]
@@ -403,10 +413,7 @@ func printList(items []aibom.AIBOM, allNamespaces bool, sortBy string) {
 		}
 		rows = append(rows, row)
 	}
-	writeTable(os.Stdout, rows)
-	if len(items) == 0 {
-		fmt.Println("No AIBOMs found.")
-	}
+	return rows
 }
 
 // humanAge renders the time elapsed since collectedAt (an RFC3339
@@ -523,58 +530,58 @@ func formatSeriesVerify(r aibom.SeriesResult) string {
 	}
 }
 
-func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief bool) {
-	fmt.Printf("Name:              %s\n", a.Name)
-	fmt.Printf("Namespace:         %s\n", a.Namespace)
-	fmt.Printf("Job:               %s\n", a.JobName)
+func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult aibom.SeriesResult, brief bool) {
+	fmt.Fprintf(w, "Name:              %s\n", a.Name)
+	fmt.Fprintf(w, "Namespace:         %s\n", a.Namespace)
+	fmt.Fprintf(w, "Job:               %s\n", a.JobName)
 	if a.Data.ExperimentName != "" && a.Data.ExperimentName != a.JobName {
-		fmt.Printf("Experiment:        %s\n", a.Data.ExperimentName)
+		fmt.Fprintf(w, "Experiment:        %s\n", a.Data.ExperimentName)
 	}
 	if a.Data.ExperimentDescription != "" {
-		fmt.Printf("Description:       %s\n", a.Data.ExperimentDescription)
+		fmt.Fprintf(w, "Description:       %s\n", a.Data.ExperimentDescription)
 	}
 	if via := a.Data.ExperimentIntentDeclaredVia; via != "" {
-		fmt.Printf("Experiment Intent: %s (via: %s)\n", a.ExperimentIntent, via)
+		fmt.Fprintf(w, "Experiment Intent: %s (via: %s)\n", a.ExperimentIntent, via)
 	} else {
-		fmt.Printf("Experiment Intent: %s\n", a.ExperimentIntent)
+		fmt.Fprintf(w, "Experiment Intent: %s\n", a.ExperimentIntent)
 	}
-	fmt.Printf("Runtime:           %s (%s -> %s)\n",
+	fmt.Fprintf(w, "Runtime:           %s (%s -> %s)\n",
 		a.Data.ExecutionMetadata.Duration(),
 		a.Data.ExecutionMetadata.EarliestPodStart(),
 		a.CollectedAt,
 	)
-	fmt.Printf("Status:            %s\n", formatPodStatus(a.Data.ExecutionMetadata.Status, nil))
-	fmt.Printf("Signature:         %s\n", formatVerify(verifyResult))
+	fmt.Fprintf(w, "Status:            %s\n", formatPodStatus(a.Data.ExecutionMetadata.Status, nil))
+	fmt.Fprintf(w, "Signature:         %s\n", formatVerify(verifyResult))
 	if seriesResult.Status != aibom.SeriesAbsent {
-		fmt.Printf("Telemetry Series:  %s\n", formatSeriesVerify(seriesResult))
+		fmt.Fprintf(w, "Telemetry Series:  %s\n", formatSeriesVerify(seriesResult))
 	}
-	fmt.Println()
-	fmt.Println(bold("Model:"))
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold("Model:"))
 	if via := a.Data.Model.NameDeclaredVia; via != "" {
-		fmt.Printf("  Name:          %s (via: %s)\n", a.Data.Model.Name, via)
+		fmt.Fprintf(w, "  Name:          %s (via: %s)\n", a.Data.Model.Name, via)
 	} else {
-		fmt.Printf("  Name:          %s\n", a.Data.Model.Name)
+		fmt.Fprintf(w, "  Name:          %s\n", a.Data.Model.Name)
 	}
-	fmt.Printf("  Version:       %s\n", a.Data.Model.Version)
+	fmt.Fprintf(w, "  Version:       %s\n", a.Data.Model.Version)
 	if a.Data.Model.Revision != "" {
-		fmt.Printf("  Revision:      %s\n", a.Data.Model.Revision)
+		fmt.Fprintf(w, "  Revision:      %s\n", a.Data.Model.Revision)
 	}
 	if a.Data.Model.BaseModel != "" {
-		fmt.Printf("  Base Model:    %s\n", a.Data.Model.BaseModel)
+		fmt.Fprintf(w, "  Base Model:    %s\n", a.Data.Model.BaseModel)
 	}
 	if a.Data.Model.SizeBytes > 0 {
-		fmt.Printf("  Size:          %.1f GB\n", float64(a.Data.Model.SizeBytes)/1e9)
+		fmt.Fprintf(w, "  Size:          %.1f GB\n", float64(a.Data.Model.SizeBytes)/1e9)
 	}
-	fmt.Printf("  Architecture:  %s\n", a.Data.Model.Architecture)
-	fmt.Printf("  Framework:     %s\n", a.Data.Model.Framework)
-	fmt.Printf("  Dtype:         %s\n", a.Data.Model.Dtype)
-	fmt.Printf("  Quantization:  %s (%d-bit)\n", a.Data.Model.Quantization, a.Data.Model.QuantizationBits)
+	fmt.Fprintf(w, "  Architecture:  %s\n", a.Data.Model.Architecture)
+	fmt.Fprintf(w, "  Framework:     %s\n", a.Data.Model.Framework)
+	fmt.Fprintf(w, "  Dtype:         %s\n", a.Data.Model.Dtype)
+	fmt.Fprintf(w, "  Quantization:  %s (%d-bit)\n", a.Data.Model.Quantization, a.Data.Model.QuantizationBits)
 	if sd := a.Data.Model.SpeculativeDecoding; sd != nil {
-		fmt.Printf("  Speculative Decoding: %s (draft: %s, tokens: %d)\n", boolStr(sd.Enabled), sd.DraftModel, sd.NumSpeculativeTokens)
+		fmt.Fprintf(w, "  Speculative Decoding: %s (draft: %s, tokens: %d)\n", boolStr(sd.Enabled), sd.DraftModel, sd.NumSpeculativeTokens)
 	}
-	fmt.Println()
-	fmt.Println(bold("Dataset:"))
-	fmt.Printf("  Declared:      %s %s (license: %s, via: %s)\n",
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold("Dataset:"))
+	fmt.Fprintf(w, "  Declared:      %s %s (license: %s, via: %s)\n",
 		a.Data.Dataset.Declared.Name, a.Data.Dataset.Declared.Version,
 		a.Data.Dataset.Declared.License, a.Data.Dataset.Declared.DeclaredVia)
 	for _, d := range a.Data.Dataset.AutoDetected {
@@ -582,46 +589,46 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 		if !d.MatchesDeclared {
 			match = red("DOES NOT MATCH DECLARED")
 		}
-		fmt.Printf("  Auto-detected: %s %s (license: %s, seen via: %s) — %s\n", d.DatasetName, d.Version, d.License, strings.Join(d.SeenVia, ", "), match)
+		fmt.Fprintf(w, "  Auto-detected: %s %s (license: %s, seen via: %s) — %s\n", d.DatasetName, d.Version, d.License, strings.Join(d.SeenVia, ", "), match)
 	}
-	fmt.Println()
-	fmt.Println(bold("Source:"))
-	fmt.Printf("  Repository:    %s\n", a.Data.SourceCode.GitRepository)
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold("Source:"))
+	fmt.Fprintf(w, "  Repository:    %s\n", a.Data.SourceCode.GitRepository)
 	dirty := fmt.Sprintf("%v", a.Data.SourceCode.Dirty)
 	if a.Data.SourceCode.Dirty {
 		dirty = yellow(dirty)
 	}
-	fmt.Printf("  Commit:        %s (branch: %s, dirty: %s, via: %s)\n",
+	fmt.Fprintf(w, "  Commit:        %s (branch: %s, dirty: %s, via: %s)\n",
 		a.Data.SourceCode.GitCommit, a.Data.SourceCode.GitBranch, dirty, a.Data.SourceCode.DeclaredVia)
 
 	if t := a.Data.Training; t != nil {
-		fmt.Println()
-		fmt.Println(bold("Training:"))
-		fmt.Printf("  Optimizer:              %s\n", t.Optimizer)
-		fmt.Printf("  Learning Rate:          %v\n", t.LearningRate)
-		fmt.Printf("  Batch Size:             %v\n", t.BatchSize)
-		fmt.Printf("  Epochs:                 %v\n", t.Epochs)
-		fmt.Printf("  Random Seed:            %v\n", t.RandomSeed)
-		fmt.Printf("  Parallelization:        %s\n", t.ParallelizationStrategy)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Training:"))
+		fmt.Fprintf(w, "  Optimizer:              %s\n", t.Optimizer)
+		fmt.Fprintf(w, "  Learning Rate:          %v\n", t.LearningRate)
+		fmt.Fprintf(w, "  Batch Size:             %v\n", t.BatchSize)
+		fmt.Fprintf(w, "  Epochs:                 %v\n", t.Epochs)
+		fmt.Fprintf(w, "  Random Seed:            %v\n", t.RandomSeed)
+		fmt.Fprintf(w, "  Parallelization:        %s\n", t.ParallelizationStrategy)
 	}
 	if ft := a.Data.FineTuning; ft != nil {
-		fmt.Println()
-		fmt.Println(bold("Fine-Tuning:"))
-		fmt.Printf("  Adaptation Method: %s\n", ft.AdaptationMethod)
-		fmt.Printf("  LoRA Rank/Alpha:   %v / %v\n", ft.LoRARank, ft.LoRAAlpha)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Fine-Tuning:"))
+		fmt.Fprintf(w, "  Adaptation Method: %s\n", ft.AdaptationMethod)
+		fmt.Fprintf(w, "  LoRA Rank/Alpha:   %v / %v\n", ft.LoRARank, ft.LoRAAlpha)
 	}
 	if inf := a.Data.Inference; inf != nil {
-		fmt.Println()
-		fmt.Println(bold("Inference:"))
-		fmt.Printf("  Serving Engine:       %s\n", inf.ServingEngine)
-		fmt.Printf("  Max Model Len:        %v\n", inf.MaxModelLen)
-		fmt.Printf("  Tensor/Pipeline/Data Parallel: %v / %v / %v\n", inf.TensorParallelSize, inf.PipelineParallelSize, inf.DataParallelSize)
-		fmt.Printf("  Expert Parallel:      %s\n", boolStr(inf.EnableExpertParallel))
-		fmt.Printf("  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
-		fmt.Printf("  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
-		fmt.Printf("  Max Tokens:           %d\n", inf.MaxTokens)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Inference:"))
+		fmt.Fprintf(w, "  Serving Engine:       %s\n", inf.ServingEngine)
+		fmt.Fprintf(w, "  Max Model Len:        %v\n", inf.MaxModelLen)
+		fmt.Fprintf(w, "  Tensor/Pipeline/Data Parallel: %v / %v / %v\n", inf.TensorParallelSize, inf.PipelineParallelSize, inf.DataParallelSize)
+		fmt.Fprintf(w, "  Expert Parallel:      %s\n", boolStr(inf.EnableExpertParallel))
+		fmt.Fprintf(w, "  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
+		fmt.Fprintf(w, "  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
+		fmt.Fprintf(w, "  Max Tokens:           %d\n", inf.MaxTokens)
 		if inf.ServedModelName != "" {
-			fmt.Printf("  Served Model Name:    %s\n", inf.ServedModelName)
+			fmt.Fprintf(w, "  Served Model Name:    %s\n", inf.ServedModelName)
 		}
 		for _, o := range []struct {
 			label string
@@ -632,52 +639,52 @@ func printDescribe(a aibom.AIBOM, verifyResult aibom.VerifyResult, seriesResult 
 			{"Prefix Caching", inf.EnablePrefixCaching},
 		} {
 			if o.v != nil {
-				fmt.Printf("  %-21s %v\n", o.label+":", o.v)
+				fmt.Fprintf(w, "  %-21s %v\n", o.label+":", o.v)
 			}
 		}
 		if perf := inf.Performance; perf != nil && len(perf.Metrics) > 0 {
-			printMetricsSection("Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, brief)
+			printMetricsSection(w, "Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, brief)
 		}
 	}
 
-	fmt.Println()
-	fmt.Println("Environment:")
-	fmt.Printf("  GPU:           %s x%d\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount)
-	fmt.Printf("  CPU:           %s x%d\n", a.Data.Environment.CPUModel, a.Data.Environment.CPUCores)
-	fmt.Printf("  Memory:        %.2f GB (%d NUMA node(s))\n", a.Data.Environment.MemoryGB, a.Data.Environment.NUMANodes)
-	fmt.Printf("  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
-	fmt.Printf("  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
-	fmt.Printf("  Kernel:        %s\n", a.Data.Environment.KernelVersion)
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Environment:")
+	fmt.Fprintf(w, "  GPU:           %s x%d\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount)
+	fmt.Fprintf(w, "  CPU:           %s x%d\n", a.Data.Environment.CPUModel, a.Data.Environment.CPUCores)
+	fmt.Fprintf(w, "  Memory:        %.2f GB (%d NUMA node(s))\n", a.Data.Environment.MemoryGB, a.Data.Environment.NUMANodes)
+	fmt.Fprintf(w, "  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
+	fmt.Fprintf(w, "  Framework:     %s\n", a.Data.Environment.FrameworkVersion)
+	fmt.Fprintf(w, "  Kernel:        %s\n", a.Data.Environment.KernelVersion)
 	for _, l := range environmentExtras(a.Data.Environment) {
-		fmt.Printf("  %-14s %s\n", l[0]+":", l[1])
+		fmt.Fprintf(w, "  %-14s %s\n", l[0]+":", l[1])
 	}
 
 	if !brief {
-		fmt.Println()
-		fmt.Println(bold("Pods:"))
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Pods:"))
 		for _, p := range a.Data.ExecutionMetadata.Pods {
-			fmt.Printf("  %s  node=%s  ip=%s  start=%s  status=%s\n",
+			fmt.Fprintf(w, "  %s  node=%s  ip=%s  start=%s  status=%s\n",
 				p.PodName, p.NodeName, p.PodIP, p.StartTime, formatPodStatus(p.Status, p.ExitCode))
 		}
 	}
 
 	ru := a.Data.ResourceUtilization
 	if ru.Note != "" {
-		fmt.Println()
-		fmt.Println(bold("Hardware Performance:"))
-		fmt.Printf("  %s\n", ru.Note)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("Hardware Performance:"))
+		fmt.Fprintf(w, "  %s\n", ru.Note)
 	} else {
-		printMetricsSection("Hardware Performance", ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, brief)
+		printMetricsSection(w, "Hardware Performance", ru.Metrics, telemetryMetricOrder, telemetryMetricLabels, ru.SummaryIncludesColdStart, brief)
 	}
 
 	if !brief {
-		fmt.Println()
-		fmt.Println(bold("AIBOM Metadata:"))
-		fmt.Printf("  Version:            %s\n", a.Data.Metadata.AIBOMVersion)
-		fmt.Printf("  Generated At:       %s\n", a.Data.Metadata.GeneratedAt)
-		fmt.Printf("  Generator:          %s\n", a.Data.Metadata.Generator)
-		fmt.Printf("  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
-		fmt.Printf("  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold("AIBOM Metadata:"))
+		fmt.Fprintf(w, "  Version:            %s\n", a.Data.Metadata.AIBOMVersion)
+		fmt.Fprintf(w, "  Generated At:       %s\n", a.Data.Metadata.GeneratedAt)
+		fmt.Fprintf(w, "  Generator:          %s\n", a.Data.Metadata.Generator)
+		fmt.Fprintf(w, "  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
+		fmt.Fprintf(w, "  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
 	}
 }
 
@@ -696,7 +703,7 @@ func boolStr(b bool) string {
 // metrics) and InferencePerformance (vLLM's own serving metrics) share this
 // rendering despite having different known metric-name sets -- see
 // telemetryMetricOrder/telemetryMetricLabels vs. vllmMetricOrder/vllmMetricLabels.
-func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, labels map[string]string) {
+func printMetricDetail(w io.Writer, metrics map[string]aibom.MetricStats, order []string, labels map[string]string) {
 	if len(metrics) == 0 {
 		return
 	}
@@ -721,7 +728,7 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 			plainCell(segmentsText),
 		})
 	}
-	writeTable(os.Stdout, rows)
+	writeTable(w, rows)
 }
 
 // printMetricsSection prints one metrics section -- shared by
@@ -732,23 +739,23 @@ func printMetricDetail(metrics map[string]aibom.MetricStats, order []string, lab
 // table is skipped, so the average is the only view of each metric). In
 // full mode the average-only line is redundant with the detail table's AVG
 // column, so it's omitted there and the detail table is printed instead.
-func printMetricsSection(title string, metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, brief bool) {
-	fmt.Println()
-	fmt.Println(bold(title + ":"))
+func printMetricsSection(w io.Writer, title string, metrics map[string]aibom.MetricStats, order []string, labels map[string]string, includesColdStart bool, brief bool) {
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, bold(title+":"))
 	if brief {
 		for _, key := range order {
 			m, ok := metrics[key]
 			if !ok {
 				continue
 			}
-			fmt.Printf("  %-16s %.2f %s\n", labels[key]+":", m.Avg, m.Unit)
+			fmt.Fprintf(w, "  %-16s %.2f %s\n", labels[key]+":", m.Avg, m.Unit)
 		}
 	}
 	if includesColdStart {
-		fmt.Println("  (includes cold start)")
+		fmt.Fprintln(w, "  (includes cold start)")
 	}
 	if !brief {
-		printMetricDetail(metrics, order, labels)
+		printMetricDetail(w, metrics, order, labels)
 	}
 }
 
@@ -814,7 +821,7 @@ func printDiff(nameA, nameB string, diffs []aibom.FieldDiff, metrics []aibom.Met
 	writeTable(os.Stdout, rows)
 }
 
-func printCompare(items []aibom.AIBOM) {
+func printCompare(w io.Writer, items []aibom.AIBOM) {
 	header := make([]cell, len(items)+1)
 	header[0] = labelHeaderCell("FIELD")
 	for i, a := range items {
@@ -835,10 +842,10 @@ func printCompare(items []aibom.AIBOM) {
 	row("Quantization", func(a aibom.AIBOM) string { return a.Data.Model.Quantization })
 	row("Intent", func(a aibom.AIBOM) string { return a.ExperimentIntent })
 	row("GPU Type", func(a aibom.AIBOM) string { return a.Data.Environment.GPUType })
-	writeTable(os.Stdout, rows)
-	fmt.Println()
+	writeTable(w, rows)
+	fmt.Fprintln(w)
 
-	fmt.Println(bold("Performance:"))
+	fmt.Fprintln(w, bold("Performance:"))
 	metricHeader := make([]cell, len(items)+1)
 	metricHeader[0] = labelHeaderCell("METRIC")
 	for i, a := range items {
@@ -864,5 +871,5 @@ func printCompare(items []aibom.AIBOM) {
 			return formatMetric(m.get(a.Data.ResourceUtilization))
 		})
 	}
-	writeTable(os.Stdout, rows)
+	writeTable(w, rows)
 }
