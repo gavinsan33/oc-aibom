@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/gsanders/oc-aibom/internal/aibom"
 )
@@ -56,6 +57,47 @@ func TestGraphTargetsFallsBackToCursor(t *testing.T) {
 	m.selected[0] = true
 	if g := m.graphTargets(); len(g) != 1 || g[0].Name != "a" {
 		t.Fatalf("graphTargets with selection = %+v, want [a]", g)
+	}
+}
+
+func TestHslicePlain(t *testing.T) {
+	if got := hslice("abcdefgh", 2, 3); got != "cde" {
+		t.Fatalf("hslice plain = %q, want %q", got, "cde")
+	}
+	if got := hslice("abc", 0, 10); got != "abc" {
+		t.Fatalf("hslice beyond end = %q, want %q", got, "abc")
+	}
+	if got := hslice("abc", 5, 3); got != "" {
+		t.Fatalf("hslice past content = %q, want empty", got)
+	}
+}
+
+func TestHslicePreservesColor(t *testing.T) {
+	// A fully-colored word, sliced in the middle, must keep the color on the
+	// visible run and occupy exactly the requested number of visible columns.
+	colored := ansiRed + "abcd" + ansiReset
+	got := hslice(colored, 1, 2)
+	if ansi.StringWidth(got) != 2 {
+		t.Fatalf("visible width = %d, want 2 (%q)", ansi.StringWidth(got), got)
+	}
+	if got != ansiRed+"bc"+ansiReset {
+		t.Fatalf("hslice colored = %q, want red bc reset", got)
+	}
+}
+
+func TestHscrollClamps(t *testing.T) {
+	m := testModel()
+	m.w = 20
+	for i := 0; i < 50; i++ { // scroll hard right, far past the content
+		(&m).hscroll("right")
+	}
+	if maxOff := m.contentWidth() - m.hViewW(); m.hoff > max(0, maxOff) {
+		t.Fatalf("hoff %d exceeds clamp %d", m.hoff, maxOff)
+	}
+	(&m).hscroll("left")
+	(&m).hscroll("left")
+	if m.hoff < 0 {
+		t.Fatalf("hoff went negative: %d", m.hoff)
 	}
 }
 

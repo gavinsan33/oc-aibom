@@ -7,6 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/mattn/go-runewidth"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/gsanders/oc-aibom/internal/aibom"
@@ -31,6 +33,7 @@ type listModel struct {
 	cursor   int
 	selected map[int]bool
 	w, h     int
+	hoff     int // horizontal scroll offset, reset on every mode change
 	mode     int
 
 	// pager: captured describe/compare output, scrolled by line offset.
@@ -107,6 +110,8 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.items) > 0 {
 			(&m).openGraph(m.graphTargets())
 		}
+	case "left", "right", "h", "l":
+		(&m).hscroll(msg.String())
 	}
 	return m, nil
 }
@@ -118,6 +123,7 @@ func (m listModel) updatePager(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "q", "esc", "backspace":
 		m.mode = modeList
+		m.hoff = 0
 	case "up", "k":
 		if m.pageOff > 0 {
 			m.pageOff--
@@ -134,6 +140,8 @@ func (m listModel) updatePager(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pageOff = 0
 	case "end", "G":
 		m.pageOff = maxOff
+	case "left", "right", "h", "l":
+		(&m).hscroll(msg.String())
 	}
 	return m, nil
 }
@@ -145,6 +153,7 @@ func (m listModel) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		if !m.gm.zoom { // let the graph model handle an un-zoom first
 			m.mode = modeList
+			m.hoff = 0
 			return m, nil
 		}
 	}
@@ -193,7 +202,56 @@ func (m *listModel) openPager(title, body string) {
 	m.pageTitle = title
 	m.pageLines = strings.Split(strings.TrimRight(body, "\n"), "\n")
 	m.pageOff = 0
+	m.hoff = 0
 	m.mode = modePager
+}
+
+// hscroll shifts the horizontal offset for the list/pager views (the graph
+// view does its own navigation). Content is often wider than the terminal,
+// especially when comparing many AIBOMs side by side.
+func (m *listModel) hscroll(key string) {
+	const step = 8
+	switch key {
+	case "left", "h":
+		m.hoff = max(0, m.hoff-step)
+	case "right", "l":
+		m.hoff += step
+		m.hoff = max(0, min(m.hoff, m.contentWidth()-m.hViewW()))
+	}
+}
+
+// hViewW is the on-screen width available to horizontally scrollable content:
+// the pager uses the full width; the list reserves 3 columns for the fixed
+// cursor/selection markers.
+func (m listModel) hViewW() int {
+	if m.mode == modePager {
+		return max(1, m.w)
+	}
+	return max(1, m.w-3)
+}
+
+// contentWidth is the widest line in the current view, used to clamp hoff so
+// scrolling right can't run past the content into blank space.
+func (m listModel) contentWidth() int {
+	lines := m.pageLines
+	if m.mode != modePager {
+		header, body := m.listLines()
+		lines = append([]string{header}, body...)
+	}
+	w := 0
+	for _, l := range lines {
+		w = max(w, ansi.StringWidth(l))
+	}
+	return w
+}
+
+// listLines renders the list table and splits it into the header row and the
+// per-item body rows (body[i] aligns with items[i]).
+func (m listModel) listLines() (header string, body []string) {
+	var buf strings.Builder
+	writeTable(&buf, listRows(m.items, m.allNS, m.sortBy))
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	return lines[0], lines[1:]
 }
 
 func (m *listModel) openGraph(items []aibom.AIBOM) {
@@ -231,16 +289,13 @@ func (m listModel) View() string {
 func (m listModel) listView() string {
 	faint := lipgloss.NewStyle().Faint(true)
 	title := lipgloss.NewStyle().Bold(true).Render("oc aibom") + faint.Render(fmt.Sprintf("  %d AIBOMs", len(m.items)))
-	help := faint.Render(" ↑↓ move · space select · enter detail/compare · g graph · q quit")
+	help := faint.Render(" ↑↓ move · ←→ scroll · space select · enter detail/compare · g graph · q quit")
 
 	if len(m.items) == 0 {
 		return title + "\n\n  No AIBOMs found.\n\n" + help
 	}
 
-	var buf strings.Builder
-	writeTable(&buf, listRows(m.items, m.allNS, m.sortBy))
-	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
-	header, body := lines[0], lines[1:] // body[i] aligns with m.items[i]
+	header, body := m.listLines() // body[i] aligns with m.items[i]
 
 	avail := max(1, m.h-4) // title, header, help, status
 	start := 0
@@ -249,9 +304,10 @@ func (m listModel) listView() string {
 	}
 	end := min(len(body), start+avail)
 
+	vw := m.hViewW()
 	var b strings.Builder
 	b.WriteString(title + "\n")
-	b.WriteString("   " + header + "\n")
+	b.WriteString("   " + hslice(header, m.hoff, vw) + "\n")
 	for i := start; i < end; i++ {
 		cur := "  "
 		if i == m.cursor {
@@ -261,7 +317,7 @@ func (m listModel) listView() string {
 		if m.selected[i] {
 			sel = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("✓")
 		}
-		b.WriteString(cur + sel + body[i] + "\n")
+		b.WriteString(cur + sel + hslice(body[i], m.hoff, vw) + "\n")
 	}
 	b.WriteString(help)
 	if m.status != "" {
@@ -275,8 +331,64 @@ func (m listModel) pagerView() string {
 	end := min(len(m.pageLines), m.pageOff+bodyH)
 	title := lipgloss.NewStyle().Bold(true).Render(m.pageTitle)
 	help := lipgloss.NewStyle().Faint(true).Render(
-		fmt.Sprintf(" ↑↓ scroll · q back · %d-%d/%d", m.pageOff+1, end, len(m.pageLines)))
-	return title + "\n" + strings.Join(m.pageLines[m.pageOff:end], "\n") + "\n" + help
+		fmt.Sprintf(" ↑↓ ←→ scroll · q back · %d-%d/%d", m.pageOff+1, end, len(m.pageLines)))
+	visible := make([]string, 0, end-m.pageOff)
+	for _, l := range m.pageLines[m.pageOff:end] {
+		visible = append(visible, hslice(l, m.hoff, m.w))
+	}
+	return title + "\n" + strings.Join(visible, "\n") + "\n" + help
+}
+
+// hslice returns the visible columns [off, off+width) of s, preserving the
+// ANSI SGR (color/bold) styling active at the cut points. x/ansi.Truncate can
+// drop columns from the right but not the left, and naively slicing runes
+// would sever escape sequences, so this walks the string: it tracks the open
+// SGR state (cleared by a reset), reopens it when output begins at off, and
+// closes it with a reset at the end. Non-SGR escapes are passed through while
+// emitting. Used for horizontal scrolling of colored list/describe lines.
+func hslice(s string, off, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	rs := []rune(s)
+	var out, sgr strings.Builder
+	col, emitting := 0, false
+	for i := 0; i < len(rs); i++ {
+		if rs[i] == 0x1b && i+1 < len(rs) && rs[i+1] == '[' { // CSI escape
+			j := i + 2
+			for j < len(rs) && (rs[j] < 0x40 || rs[j] > 0x7e) {
+				j++
+			}
+			seq := string(rs[i:min(j+1, len(rs))])
+			if j < len(rs) && rs[j] == 'm' { // SGR: track so it can be reopened
+				if seq == "\x1b[0m" || seq == "\x1b[m" {
+					sgr.Reset()
+				} else {
+					sgr.WriteString(seq)
+				}
+			}
+			if emitting {
+				out.WriteString(seq)
+			}
+			i = j
+			continue
+		}
+		w := runewidth.RuneWidth(rs[i])
+		if col >= off && col+w <= off+width {
+			if !emitting {
+				emitting = true
+				out.WriteString(sgr.String())
+			}
+			out.WriteRune(rs[i])
+		}
+		if col += w; col >= off+width {
+			break
+		}
+	}
+	if emitting && sgr.Len() > 0 {
+		out.WriteString(ansiReset)
+	}
+	return out.String()
 }
 
 func runListTUI(items []aibom.AIBOM, client dynamic.Interface, allNS bool, sortBy string) error {
