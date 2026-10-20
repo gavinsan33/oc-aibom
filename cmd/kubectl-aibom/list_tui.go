@@ -541,9 +541,16 @@ func (m listModel) listView() string {
 	}
 	b.WriteString(footer)
 	if m.status != "" {
-		b.WriteString("\n" + faint.Render(" "+m.status))
+		b.WriteString("\n" + m.statusLine(faint))
 	}
 	return b.String()
+}
+
+// statusLine renders the transient status (telemetry notes, errors) as a single
+// faint line clamped to the terminal width. The notes can be long multi-clause
+// sentences joined across runs, which would otherwise wrap and look broken.
+func (m listModel) statusLine(faint lipgloss.Style) string {
+	return ansi.Truncate(faint.Render(" "+m.status), max(1, m.w), "…")
 }
 
 // listFooter is the two-line tip bar under the list, or the live filter prompt
@@ -571,7 +578,7 @@ func (m listModel) pagerView() string {
 		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" c · ") + changedIndicator(m.pageChanged)
 	}
 	if m.status != "" {
-		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" "+m.status)
+		footer += "\n" + m.statusLine(lipgloss.NewStyle().Faint(true))
 	}
 
 	visible := make([]string, 0, end-m.pageOff)
