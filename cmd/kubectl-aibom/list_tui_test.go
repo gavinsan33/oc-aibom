@@ -112,6 +112,49 @@ func TestClearSelection(t *testing.T) {
 	}
 }
 
+func TestComparePagerChangedToggle(t *testing.T) {
+	m := testModel()
+	m.focus = []aibom.AIBOM{m.items[0], m.items[1]}
+	m.pageKind = pageCompare
+	(&m).renderPager()
+	full := len(m.pageLines)
+
+	nm, _ := m.updatePager(key("c"))
+	m = nm.(listModel)
+	if !m.pageChanged {
+		t.Fatal("c did not enable --changed in compare pager")
+	}
+	if len(m.pageLines) > full {
+		t.Fatalf("changed view (%d lines) should not exceed full view (%d)", len(m.pageLines), full)
+	}
+
+	nm, _ = m.updatePager(key("c"))
+	m = nm.(listModel)
+	if m.pageChanged {
+		t.Fatal("second c did not disable --changed")
+	}
+}
+
+func TestChangedToggleIgnoredOnDetailPager(t *testing.T) {
+	m := testModel()
+	m.pageKind = pageDetail
+	m.pageLines = []string{"Name: a"}
+	nm, _ := m.updatePager(key("c"))
+	m = nm.(listModel)
+	if m.pageChanged {
+		t.Fatal("c should not toggle --changed on a detail pager")
+	}
+}
+
+func TestDetailFromFocusPicksCompareForMany(t *testing.T) {
+	m := testModel()
+	m.focus = []aibom.AIBOM{m.items[0], m.items[1]}
+	(&m).detailFromFocus()
+	if m.mode != modePager || m.pageKind != pageCompare {
+		t.Fatalf("two-run focus → mode %d kind %d, want pager/compare", m.mode, m.pageKind)
+	}
+}
+
 func TestResizeClampsPagerOffset(t *testing.T) {
 	m := testModel()
 	m.mode = modePager

@@ -24,6 +24,11 @@ const (
 	modeGraph
 )
 
+const (
+	pageDetail = iota
+	pageCompare
+)
+
 type listModel struct {
 	items  []aibom.AIBOM
 	client dynamic.Interface
@@ -36,10 +41,16 @@ type listModel struct {
 	hoff     int // horizontal scroll offset, reset on every mode change
 	mode     int
 
+	// focus is the AIBOM(s) the pager or graph currently shows, so g (graph)
+	// and d (detail) can switch between the two views of the same subject.
+	focus []aibom.AIBOM
+
 	// pager: captured describe/compare output, scrolled by line offset.
-	pageTitle string
-	pageLines []string
-	pageOff   int
+	pageKind    int // pageDetail or pageCompare
+	pageChanged bool
+	pageTitle   string
+	pageLines   []string
+	pageOff     int
 
 	// graph: the existing graph TUI, composed as a sub-model so q/esc backs
 	// out to the list instead of quitting.
@@ -148,6 +159,13 @@ func (m listModel) updatePager(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pageOff = maxOff
 	case "left", "right", "h", "l":
 		(&m).hscroll(msg.String())
+	case "g":
+		(&m).openGraph(m.focus)
+	case "c":
+		if m.pageKind == pageCompare {
+			m.pageChanged = !m.pageChanged
+			(&m).renderPager()
+		}
 	}
 	return m, nil
 }
@@ -160,6 +178,11 @@ func (m listModel) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.gm.zoom { // let the graph model handle an un-zoom first
 			m.mode = modeList
 			m.hoff = 0
+			return m, nil
+		}
+	case "d":
+		if !m.gm.zoom {
+			(&m).detailFromFocus()
 			return m, nil
 		}
 	}
@@ -190,24 +213,36 @@ func (m listModel) graphTargets() []aibom.AIBOM {
 }
 
 func (m *listModel) openDetail(a aibom.AIBOM) {
-	ctx := context.Background()
-	vr := aibom.Verify(ctx, m.client, a)
-	sr := aibom.VerifySeries(ctx, m.client, a, vr)
-	var b strings.Builder
-	printDescribe(&b, a, vr, sr, false)
-	m.openPager("describe "+a.Name, b.String())
+	m.focus = []aibom.AIBOM{a}
+	m.pageKind = pageDetail
+	m.pageOff = 0
+	m.renderPager()
 }
 
 func (m *listModel) openCompare(items []aibom.AIBOM) {
-	var b strings.Builder
-	printCompare(&b, items, false)
-	m.openPager(fmt.Sprintf("compare (%d AIBOMs)", len(items)), b.String())
+	m.focus = items
+	m.pageKind = pageCompare
+	m.pageOff = 0
+	m.renderPager()
 }
 
-func (m *listModel) openPager(title, body string) {
-	m.pageTitle = title
-	m.pageLines = strings.Split(strings.TrimRight(body, "\n"), "\n")
-	m.pageOff = 0
+// renderPager (re)captures the current focus into the pager for the active
+// pageKind. Called on open and whenever the compare --changed toggle flips.
+func (m *listModel) renderPager() {
+	var b strings.Builder
+	if m.pageKind == pageDetail {
+		a := m.focus[0]
+		ctx := context.Background()
+		vr := aibom.Verify(ctx, m.client, a)
+		sr := aibom.VerifySeries(ctx, m.client, a, vr)
+		printDescribe(&b, a, vr, sr, false)
+		m.pageTitle = "describe " + a.Name
+	} else {
+		printCompare(&b, m.focus, m.pageChanged)
+		m.pageTitle = fmt.Sprintf("compare (%d AIBOMs)", len(m.focus))
+	}
+	m.pageLines = strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
+	m.pageOff = min(m.pageOff, max(0, len(m.pageLines)-m.pagerBodyH()))
 	m.hoff = 0
 	m.mode = modePager
 }
@@ -272,11 +307,24 @@ func (m *listModel) openGraph(items []aibom.AIBOM) {
 		m.status = err.Error()
 		return
 	}
+	m.focus = items
 	gm := newGraphModel(runs, keys, false)
+	gm.embedded = true // show "d detail · q back" instead of "q quit"
 	nm, _ := gm.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h})
 	m.gm = nm.(graphModel)
 	m.status = strings.Join(notes, " · ")
 	m.mode = modeGraph
+}
+
+// detailFromFocus returns to the pager for whatever the graph is showing: a
+// single AIBOM's describe, or the compare table for several.
+func (m *listModel) detailFromFocus() {
+	switch {
+	case len(m.focus) == 1:
+		m.openDetail(m.focus[0])
+	case len(m.focus) >= 2:
+		m.openCompare(m.focus)
+	}
 }
 
 func (m listModel) pagerBodyH() int { return max(1, m.h-2) }
@@ -336,13 +384,34 @@ func (m listModel) pagerView() string {
 	bodyH := m.pagerBodyH()
 	end := min(len(m.pageLines), m.pageOff+bodyH)
 	title := lipgloss.NewStyle().Bold(true).Render(m.pageTitle)
-	help := lipgloss.NewStyle().Faint(true).Render(
-		fmt.Sprintf(" ↑↓ ←→ scroll · q back · %d-%d/%d", m.pageOff+1, end, len(m.pageLines)))
+
+	keys := " ↑↓ ←→ scroll · g graph · q back"
+	if m.pageKind == pageCompare {
+		keys = " ↑↓ ←→ scroll · g graph · c changed · q back"
+	}
+	footer := lipgloss.NewStyle().Faint(true).Render(
+		fmt.Sprintf("%s · %d-%d/%d", keys, m.pageOff+1, end, len(m.pageLines)))
+	if m.pageKind == pageCompare {
+		footer += "   " + changedIndicator(m.pageChanged)
+	}
+	if m.status != "" {
+		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" "+m.status)
+	}
+
 	visible := make([]string, 0, end-m.pageOff)
 	for _, l := range m.pageLines[m.pageOff:end] {
 		visible = append(visible, hslice(l, m.hoff, m.w))
 	}
-	return title + "\n" + strings.Join(visible, "\n") + "\n" + help
+	return title + "\n" + strings.Join(visible, "\n") + "\n" + footer
+}
+
+// changedIndicator is the bottom-of-screen toggle state for compare's
+// --changed filter: green when on (only differing fields), faint when off.
+func changedIndicator(on bool) string {
+	if on {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true).Render("[--changed ON]")
+	}
+	return lipgloss.NewStyle().Faint(true).Render("[--changed off]")
 }
 
 // hslice returns the visible columns [off, off+width) of s, preserving the
