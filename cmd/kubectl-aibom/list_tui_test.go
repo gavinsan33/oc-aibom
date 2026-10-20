@@ -11,8 +11,10 @@ import (
 )
 
 func testModel() listModel {
+	items := []aibom.AIBOM{{Name: "a"}, {Name: "b"}, {Name: "c"}}
 	return listModel{
-		items:    []aibom.AIBOM{{Name: "a"}, {Name: "b"}, {Name: "c"}},
+		all:      items,
+		items:    items,
 		selected: map[int]bool{},
 	}
 }
@@ -46,6 +48,55 @@ func TestListSelectOrder(t *testing.T) {
 	got := m.selectedItems()
 	if len(got) != 2 || got[0].Name != "a" || got[1].Name != "c" {
 		t.Fatalf("selectedItems = %+v, want [a c]", got)
+	}
+}
+
+func TestSortMenuAppliesAndResets(t *testing.T) {
+	m := testModel()
+	m.sortBy = "age"
+	m.cursor = 2
+	m.selected[1] = true
+
+	// s opens the menu at the current field (age, index 0).
+	nm, _ := m.updateList(key("s"))
+	m = nm.(listModel)
+	if m.mode != modeSort || m.sortCursor != 0 {
+		t.Fatalf("after s: mode=%d sortCursor=%d, want modeSort at 0", m.mode, m.sortCursor)
+	}
+	// space flips direction; down moves to gpu-utilization; enter applies.
+	for _, k := range []string{" ", "j", "enter"} {
+		nm, _ = m.updateSort(key(k))
+		m = nm.(listModel)
+	}
+	if m.mode != modeList {
+		t.Fatalf("after enter: mode=%d, want modeList", m.mode)
+	}
+	if m.sortBy != "gpu-utilization" || !m.ascending {
+		t.Fatalf("got sortBy=%q ascending=%v, want gpu-utilization ascending", m.sortBy, m.ascending)
+	}
+	if m.cursor != 0 || len(m.selected) != 0 {
+		t.Fatalf("apply should reset cursor/selection, got cursor=%d selected=%v", m.cursor, m.selected)
+	}
+}
+
+func TestFilterNarrowsAndClears(t *testing.T) {
+	m := testModel()
+	m.mode = modeFilter
+	m.cursor = 2
+	// type "b": only the "b" row survives.
+	nm, _ := m.updateFilter(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	m = nm.(listModel)
+	if len(m.items) != 1 || m.items[0].Name != "b" {
+		t.Fatalf("after filtering 'b': items=%+v, want [b]", m.items)
+	}
+	if m.cursor != 0 {
+		t.Fatalf("filter should reset cursor, got %d", m.cursor)
+	}
+	// esc clears the filter and restores all rows.
+	nm, _ = m.updateFilter(tea.KeyMsg{Type: tea.KeyEsc})
+	m = nm.(listModel)
+	if m.mode != modeList || m.filter != "" || len(m.items) != 3 {
+		t.Fatalf("after esc: mode=%d filter=%q items=%d, want list/empty/3", m.mode, m.filter, len(m.items))
 	}
 }
 
