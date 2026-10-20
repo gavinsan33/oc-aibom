@@ -216,8 +216,9 @@ func main() {
 				limits := map[string]float64{}
 				if a.Data.ResourceUtilization.Metrics != nil {
 					for k, m := range a.Data.ResourceUtilization.Metrics {
+						// The series is in raw base units; the stored limit is in display units.
 						if m.Limit != nil && *m.Limit > 0 {
-							limits[k] = *m.Limit
+							limits[k] = limitInSeriesUnit(*m.Limit, m.Unit)
 						}
 					}
 				}

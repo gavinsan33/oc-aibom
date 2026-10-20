@@ -45,6 +45,27 @@ func sparkline(pts [][2]float64, width int, lo, hi float64) string {
 	return b.String()
 }
 
+// limitInSeriesUnit converts a resource_utilization limit from the display
+// unit the webhook stored it in back to the series' raw base unit, so it can
+// be drawn against the (raw-unit) series. The webhook scales each limit the
+// same way it scales that metric's stats (postprocess.py's resource unit_map),
+// e.g. an 8 GiB limit is stored as 8 while the series stays in bytes.
+// ponytail: mirrors the webhook's unit_map by hand; add a case if it grows.
+func limitInSeriesUnit(limit float64, displayUnit string) float64 {
+	switch displayUnit {
+	case "GiB":
+		return limit * (1 << 30) // -> bytes
+	case "GB":
+		return limit * 1e9 // -> bytes (older label)
+	case "Mbps":
+		return limit * (1e6 / 8) // -> bytes_per_sec
+	case "MBps":
+		return limit * 1e6 // -> bytes_per_sec
+	default:
+		return limit
+	}
+}
+
 // fmtSeriesValue scales the series' raw base units to the display units
 // describe uses.
 func fmtSeriesValue(unit string, v float64) string {
