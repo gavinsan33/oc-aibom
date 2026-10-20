@@ -203,25 +203,25 @@ func renderChart(rows []graphRow, lo, hi float64, unit string, limit float64, sh
 	}
 	sort.Ints(cis) // deterministic tie-breaks
 	cell := func(i int) (lipgloss.Color, rune) {
-		var union rune
+		var union, limitMask rune
 		best, bestN, overlap := 0, 0, false
-		hasLimit := false
 		for _, ci := range cis {
 			mk := masks[ci][i]
 			if mk == 0 {
 				continue
 			}
 			if ci == -1 {
-				hasLimit = true
+				limitMask = mk
+				continue // kept separate so the line stays one dot thick
 			}
 			overlap = overlap || union&mk != 0
 			union |= mk
-			if n := bits.OnesCount32(uint32(mk)); n >= bestN && ci != -1 {
+			if n := bits.OnesCount32(uint32(mk)); n >= bestN {
 				best, bestN = ci, n
 			}
 		}
-		if hasLimit {
-			return lipgloss.Color("1"), union // red for limit line
+		if limitMask != 0 {
+			return lipgloss.Color("1"), limitMask // red, just the limit's own row
 		}
 		if overlap {
 			return overlapColor, union
