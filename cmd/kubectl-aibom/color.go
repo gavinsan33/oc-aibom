@@ -20,6 +20,7 @@ const (
 	ansiBlue      = "\x1b[34m"
 	ansiMagenta   = "\x1b[35m"
 	ansiCyan      = "\x1b[36m"
+	ansiLightCyan = "\x1b[96m"
 	ansiDefaultFG = "\x1b[39m"
 )
 

@@ -823,7 +823,7 @@ func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
 		if fr.Differs {
 			anyDiff = true
 			marked := fr.Label + " *" // visible even with color disabled
-			label = coloredCell(marked, boldColorize(ansiCyan, marked))
+			label = coloredCell(marked, colorize(ansiLightCyan, marked))
 		}
 		cells := []cell{label}
 		for i, v := range fr.Values {
