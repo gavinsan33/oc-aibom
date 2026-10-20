@@ -213,7 +213,16 @@ func main() {
 					continue
 				}
 				notes = append(notes, fmt.Sprintf("%s: telemetry series %s", name, formatSeriesVerify(sr)))
-				runs = append(runs, graphRun{Name: name, Series: s})
+				limits := map[string]float64{}
+				if a.Data.ResourceUtilization.Metrics != nil {
+					for k, m := range a.Data.ResourceUtilization.Metrics {
+						// The series is in raw base units; the stored limit is in display units.
+						if m.Limit != nil && *m.Limit > 0 {
+							limits[k] = limitInSeriesUnit(*m.Limit, m.Unit)
+						}
+					}
+				}
+				runs = append(runs, graphRun{Name: name, Series: s, Limits: limits})
 			}
 			printNotes := func() { fmt.Fprintln(os.Stderr, strings.Join(notes, "\n")) }
 			if len(runs) == 0 {

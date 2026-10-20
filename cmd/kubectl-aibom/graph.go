@@ -45,6 +45,27 @@ func sparkline(pts [][2]float64, width int, lo, hi float64) string {
 	return b.String()
 }
 
+// limitInSeriesUnit converts a resource_utilization limit from the display
+// unit the webhook stored it in back to the series' raw base unit, so it can
+// be drawn against the (raw-unit) series. The webhook scales each limit the
+// same way it scales that metric's stats (postprocess.py's resource unit_map),
+// e.g. an 8 GiB limit is stored as 8 while the series stays in bytes.
+// ponytail: mirrors the webhook's unit_map by hand; add a case if it grows.
+func limitInSeriesUnit(limit float64, displayUnit string) float64 {
+	switch displayUnit {
+	case "GiB":
+		return limit * (1 << 30) // -> bytes
+	case "GB":
+		return limit * 1e9 // -> bytes (older label)
+	case "Mbps":
+		return limit * (1e6 / 8) // -> bytes_per_sec
+	case "MBps":
+		return limit * 1e6 // -> bytes_per_sec
+	default:
+		return limit
+	}
+}
+
 // fmtSeriesValue scales the series' raw base units to the display units
 // describe uses.
 func fmtSeriesValue(unit string, v float64) string {
@@ -137,6 +158,7 @@ func graphMetricLabel(k string) string {
 type graphRun struct {
 	Name   string
 	Series aibom.Series
+	Limits map[string]float64
 }
 
 type graphRow struct {
@@ -158,8 +180,8 @@ func sharedElapsed(runs []graphRun) int64 {
 
 // graphRows is the lines to draw for one metric: one aggregate row per run
 // that has it, or with perSeries (and more than one, undropped series) that
-// run's pod/GPU/container rows instead.
-func graphRows(runs []graphRun, k string, perSeries bool) (rows []graphRow, unit string) {
+// run's pod/GPU/container rows instead. Returns the first available limit.
+func graphRows(runs []graphRun, k string, perSeries bool) (rows []graphRow, unit string, limit float64) {
 	for i, r := range runs {
 		dur := r.Series.Window.End - r.Series.Window.Start
 		m, ok := r.Series.Metrics[k]
@@ -188,8 +210,11 @@ func graphRows(runs []graphRun, k string, perSeries bool) (rows []graphRow, unit
 			row.peak = fmt.Sprintf("  peak %s", fmtSeriesValue(m.Unit, pk))
 		}
 		rows = append(rows, row)
+		if limit == 0 {
+			limit = r.Limits[k]
+		}
 	}
-	return rows, unit
+	return rows, unit, limit
 }
 
 // printGraph draws one block per metric with a row per run, mirroring the
@@ -208,7 +233,7 @@ func printGraph(w io.Writer, runs []graphRun, only []string, perSeries bool, wid
 	fmt.Fprintf(w, "Elapsed time since each run's start; the axis spans 0 → %s (longest run).\n\n", time.Duration(sharedMax)*time.Second)
 
 	for _, k := range order {
-		rows, unit := graphRows(runs, k, perSeries)
+		rows, unit, limit := graphRows(runs, k, perSeries)
 		if len(rows) == 0 {
 			continue
 		}
@@ -220,7 +245,11 @@ func printGraph(w io.Writer, runs []graphRun, only []string, perSeries bool, wid
 			labelW = max(labelW, utf8.RuneCountInString(row.label))
 		}
 		label := graphMetricLabel(k)
-		fmt.Fprintln(w, cyan(label))
+		limitSuffix := ""
+		if limit > 0 {
+			limitSuffix = fmt.Sprintf(" (limit: %s)", fmtSeriesValue(unit, limit))
+		}
+		fmt.Fprintln(w, cyan(label+limitSuffix))
 		avail := max(10, width-labelW-2)
 		for _, row := range rows {
 			cells := max(1, min(avail, int(float64(avail)*float64(row.dur)/float64(sharedMax)+0.5)))

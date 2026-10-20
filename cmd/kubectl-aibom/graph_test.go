@@ -40,7 +40,7 @@ func TestPrintGraph(t *testing.T) {
 		}
 		return s
 	}
-	runs := []graphRun{{"short", mk(1000, 1060, 1)}, {"long", mk(5000, 5120, 2)}}
+	runs := []graphRun{{Name: "short", Series: mk(1000, 1060, 1)}, {Name: "long", Series: mk(5000, 5120, 2)}}
 	var buf bytes.Buffer
 	if err := printGraph(&buf, runs, nil, false, 40); err != nil {
 		t.Fatal(err)
@@ -60,6 +60,36 @@ func TestPrintGraph(t *testing.T) {
 	}
 }
 
+func TestLimitInSeriesUnit(t *testing.T) {
+	// A limit stored in display units must come back in the series' raw base unit.
+	if got := limitInSeriesUnit(8, "GiB"); got != 8*(1<<30) {
+		t.Fatalf("GiB: %v", got)
+	}
+	if got := limitInSeriesUnit(50, "MBps"); got != 50e6 {
+		t.Fatalf("MBps: %v", got)
+	}
+	if got := limitInSeriesUnit(4, "cores"); got != 4 {
+		t.Fatalf("cores: %v", got)
+	}
+}
+
+func TestPrintGraphLimit(t *testing.T) {
+	var s aibom.Series
+	s.Window.Start, s.Window.End = 1000, 1060
+	s.Metrics = map[string]aibom.SeriesMetric{
+		"memory_usage": {Unit: "bytes", Aggregate: [][2]float64{{1000, 1 << 30}, {1060, 1 << 30}}},
+	}
+	// 8 GiB limit, as it is stored in resource_utilization (already converted to raw bytes).
+	runs := []graphRun{{Name: "r", Series: s, Limits: map[string]float64{"memory_usage": 8 * (1 << 30)}}}
+	var buf bytes.Buffer
+	if err := printGraph(&buf, runs, nil, false, 40); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "limit: 8.00 GiB") {
+		t.Fatalf("limit not shown in GiB: %s", buf.String())
+	}
+}
+
 func tuiRuns() []graphRun {
 	mk := func(dur int64, amp float64) aibom.Series {
 		var s aibom.Series
@@ -74,7 +104,7 @@ func tuiRuns() []graphRun {
 		}
 		return s
 	}
-	return []graphRun{{"run1", mk(3600, 90)}, {"run2", mk(1800, 60)}}
+	return []graphRun{{Name: "run1", Series: mk(3600, 90)}, {Name: "run2", Series: mk(1800, 60)}}
 }
 
 func TestGraphModelView(t *testing.T) {
@@ -107,7 +137,7 @@ func TestGraphModelOverlapAndHide(t *testing.T) {
 
 	// Two identical runs: every dot coincides, so the plot is all overlap color.
 	r := tuiRuns()[0]
-	runs := []graphRun{{"a", r.Series}, {"b", r.Series}}
+	runs := []graphRun{{Name: "a", Series: r.Series}, {Name: "b", Series: r.Series}}
 	keys, _ := graphMetricKeys(runs, nil)
 	var m tea.Model = newGraphModel(runs, keys, false)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
