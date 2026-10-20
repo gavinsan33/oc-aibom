@@ -22,6 +22,30 @@ oc aibom list --sort-by=gpu-utilization     # rank by a performance metric (high
 oc aibom list --sort-by=gpu-power --ascending
 ```
 
+## Interactive browser
+
+Run `oc aibom` with no subcommand on a terminal (stdout not piped) and it opens a full-screen browser over the same table: move a cursor through the rows and drill into a single AIBOM's `describe`, a side-by-side `compare` of several, or the overlaid `graph` view — without leaving the terminal. Piping (`oc aibom | grep …`) still prints the plain table. Any `--sort-by`/`--ascending`/filter flags you pass seed the browser's initial state.
+
+### Keys
+
+| Key | Action |
+|-----|--------|
+| `↑` `↓`, `k` `j` | Move the cursor (`home`/`end`, `G` jump to ends) |
+| `←` `→`, `h` `l` | Scroll a wide table sideways |
+| `space` | Select / deselect the row |
+| `enter` | Describe the row, or compare when two or more are selected |
+| `g` | Graph the selection (or the row under the cursor) |
+| `s` | Open the **sort** menu (pick a field and direction) |
+| `f`, `/` | Open the live **filter** prompt |
+| `esc` | Clear the selection |
+| `q`, `ctrl+c` | Quit |
+
+In the **sort** menu: `↑`/`↓` pick a field (age plus the `--sort-by` metrics), `space` or `←`/`→` flips the direction, `enter` applies, `esc` cancels.
+
+In the **filter** prompt: type to narrow the list live (a case-insensitive substring over the visible columns), `enter` keeps the filter, `esc` clears it.
+
+Inside the describe/compare/graph pages, a `[d] Detail view` / `[g] Graph view` tab bar shows where you are; `d` and `g` switch between the two views of the same subject, and `q`/`esc` backs out to the list.
+
 ## Filtering
 
 All filters are exact-match and case-insensitive, and can be combined. Combined filters are AND'd together.

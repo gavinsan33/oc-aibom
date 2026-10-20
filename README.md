@@ -86,6 +86,28 @@ together). `--sort-by` accepts: `gpu-utilization`, `gpu-memory`, `gpu-power`,
 `cpu-usage`, `memory-usage`, `network-rx`, `network-tx` — and adds the
 corresponding column to the table.
 
+Run `oc aibom` with **no subcommand** on a terminal and it opens a
+full-screen browser over the same table: move a cursor through the
+rows and drill into `describe`, `compare` or `graph` without leaving the
+terminal (piping still prints the plain table). Any `--sort-by`/`--ascending`/
+filter flags seed its initial state.
+
+| Key | Action |
+| --- | --- |
+| `↑` `↓` / `kj` | move the cursor (`home`/`end`/`G` to the ends) |
+| `←` `→` / `hl` | scroll a wide table sideways |
+| `space` | select / deselect the row |
+| `enter` | describe the row, or compare two or more selected |
+| `g` | graph the selection (or the row under the cursor) |
+| `s` | sort menu (`↑↓` field, `space`/`←→` direction, `enter` apply) |
+| `f` / `/` | live substring filter over the visible columns |
+| `esc` | clear the selection |
+| `q` / `ctrl+c` | quit |
+
+Inside the describe/compare/graph pages a `[d] Detail` / `[g] Graph` tab bar
+shows where you are; `d` and `g` switch between the two views of the same
+subject, and `q`/`esc` backs out to the list.
+
 ### `oc aibom describe <name>`
 
 Prints a human-readable summary of a single AIBOM's model, dataset
@@ -159,7 +181,7 @@ stored series print no such line.
 Charts AIBOMs' stored telemetry time series (the `AIBOMTelemetry` object each
 `telemetry_series_ref` points at — see aibom-webhook-service's `CLAUDE.md`,
 "Telemetry Time Series"), so it works after Prometheus's retention window has
-passed. On a terminal it opens a full-screen, btop-style view (alternate
+passed. On a terminal it opens a full-screen view (alternate
 screen, like `less`): a grid of braille line charts, one per metric, with
 every given run overlaid in its own color. Like the console plugin's compare
 telemetry tab, x is elapsed time since each run's own start on a shared axis
@@ -173,7 +195,12 @@ telemetry tab, x is elapsed time since each run's own start on a shared axis
 | `enter` / `z` | zoom the selected metric full screen (`enter`, `q` or `esc` to go back) |
 | `1`–`9` | hide / show that run (the y scale stays put) |
 | `p` | per-pod / GPU / container lines instead of each run's aggregate |
+| `t` | show / hide the red limit line |
 | `q` / `esc` | quit (when zoomed, go back first; `ctrl+c` always quits) |
+
+When opened from the interactive browser (not as a standalone command), a
+`[d] Detail` / `[g] Graph` tab bar appears: `d` jumps to the describe/compare
+page for the same run(s), and `q`/`esc` backs out to the list instead of quitting.
 
 Where runs' lines coincide the cell is drawn white, since a terminal cell
 can only hold one color; hide runs with `1`–`9` to see each one on its own.

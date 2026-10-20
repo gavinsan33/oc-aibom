@@ -15,7 +15,7 @@ oc aibom graph run1 run2 --text --width 100
 
 ## Interactive view
 
-On a terminal, `graph` opens a full-screen view (on the alternate screen, like `less` or `btop`) with one braille line chart per metric. Every run you name is overlaid in its own color, as in the console plugin's compare view.
+On a terminal, `graph` opens a full-screen view (on the alternate screen, like `less`) with one braille line chart per metric. Every run you name is overlaid in its own color, as in the console plugin's compare view.
 
 ![Two runs compared across GPU, CPU, memory and network panels](../img/graph-grid-overview.png)
 
@@ -43,10 +43,13 @@ To look at one run on its own, hide the others with `1`–`9`. The value scale s
 | `enter`, `z` | Zoom the selected metric; again to go back |
 | `1`–`9` | Hide or show that run (numbered as in the header) |
 | `p` | Per-pod, per-GPU or per-container lines instead of each run's aggregate |
+| `t` | Show or hide the red limit line |
 | `q`, `esc` | Go back from a zoom; otherwise quit |
 | `ctrl+c` | Quit from anywhere |
 
-`p` only changes a run that has more than one series stored for that metric. Detail is dropped at record time for a metric with more than 64 series, in which case the aggregate is shown.
+`p` only changes a run that has more than one series stored for that metric.
+
+When the graph is opened from the [interactive browser](list.md#interactive-browser) rather than as a standalone command, a `[d] Detail view` / `[g] Graph view` tab bar appears at the top: `d` jumps to the describe/compare page for the same run(s), and `q`/`esc` backs out to the list instead of quitting. Detail is dropped at record time for a metric with more than 64 series, in which case the aggregate is shown.
 
 ## Text output
 
