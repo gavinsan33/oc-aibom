@@ -114,6 +114,8 @@ func (m listModel) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.items) > 0 {
 			(&m).openGraph(m.graphTargets())
 		}
+	case "c", "esc":
+		m.selected = map[int]bool{}
 	case "left", "right", "h", "l":
 		(&m).hscroll(msg.String())
 	}
@@ -293,7 +295,7 @@ func (m listModel) View() string {
 func (m listModel) listView() string {
 	faint := lipgloss.NewStyle().Faint(true)
 	title := lipgloss.NewStyle().Bold(true).Render("oc aibom") + faint.Render(fmt.Sprintf("  %d AIBOMs", len(m.items)))
-	help := faint.Render(" ↑↓ move · ←→ scroll · space select · enter detail/compare · g graph · q quit")
+	help := faint.Render(" ↑↓ move · ←→ scroll · space select · c clear · enter detail/compare · g graph · q quit")
 
 	if len(m.items) == 0 {
 		return title + "\n\n  No AIBOMs found.\n\n" + help
