@@ -129,8 +129,9 @@ var brailleBit = [2][4]rune{{0x01, 0x02, 0x04, 0x40}, {0x08, 0x10, 0x20, 0x80}}
 // row's dots are merged into one cell grid (a library that redraws per
 // dataset would wipe earlier runs). A terminal cell has one color, so where
 // runs share one: dots that coincide draw in overlapColor, otherwise the run
-// with the most dots in the cell wins.
-func renderChart(rows []graphRow, lo, hi float64, unit string, sharedMax int64, w, h int) string {
+// with the most dots in the cell wins. When limit > 0, a red horizontal line
+// marks the limit value.
+func renderChart(rows []graphRow, lo, hi float64, unit string, limit float64, sharedMax int64, w, h int) string {
 	labels := [3]string{fmtSeriesValue(unit, hi), fmtSeriesValue(unit, (lo+hi)/2), fmtSeriesValue(unit, lo)}
 	labelW := 0
 	for _, l := range labels {
@@ -186,6 +187,16 @@ func renderChart(rows []graphRow, lo, hi float64, unit string, sharedMax int64, 
 		}
 	}
 
+	// Draw horizontal limit line in red when present
+	if limit > 0 && limit >= lo && limit <= hi {
+		limitColor := -1 // sentinel for limit line
+		y := int((1 - (limit-lo)/(hi-lo)) * float64(dh-1))
+		y = max(0, min(dh-1, y))
+		for x := 0; x < dw; x++ {
+			set(x, y, limitColor)
+		}
+	}
+
 	var cis []int
 	for ci := range masks {
 		cis = append(cis, ci)
@@ -194,16 +205,23 @@ func renderChart(rows []graphRow, lo, hi float64, unit string, sharedMax int64, 
 	cell := func(i int) (lipgloss.Color, rune) {
 		var union rune
 		best, bestN, overlap := 0, 0, false
+		hasLimit := false
 		for _, ci := range cis {
 			mk := masks[ci][i]
 			if mk == 0 {
 				continue
 			}
+			if ci == -1 {
+				hasLimit = true
+			}
 			overlap = overlap || union&mk != 0
 			union |= mk
-			if n := bits.OnesCount32(uint32(mk)); n >= bestN {
+			if n := bits.OnesCount32(uint32(mk)); n >= bestN && ci != -1 {
 				best, bestN = ci, n
 			}
+		}
+		if hasLimit {
+			return lipgloss.Color("1"), union // red for limit line
 		}
 		if overlap {
 			return overlapColor, union
@@ -259,14 +277,14 @@ func abs(n int) int {
 }
 
 func (m graphModel) panel(k string, selected bool, w, h int) string {
-	all, unit := graphRows(m.runs, k, m.pods)
+	all, unit, limit := graphRows(m.runs, k, m.pods)
 	lo, hi := graphRange(all)
 	border := lipgloss.Color("8")
 	if selected {
 		border = lipgloss.Color("6")
 	}
 	title := lipgloss.NewStyle().Bold(true).Render(graphMetricLabel(k))
-	body := title + "\n" + renderChart(m.visible(all), lo, hi, unit, m.sharedMax, max(10, w-2), max(4, h-3))
+	body := title + "\n" + renderChart(m.visible(all), lo, hi, unit, limit, m.sharedMax, max(10, w-2), max(4, h-3))
 	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).
 		Width(w - 2).Height(h - 2).Render(body)
 }
@@ -274,7 +292,7 @@ func (m graphModel) panel(k string, selected bool, w, h int) string {
 // statsLines is the selected metric's min/avg/max per row, capped so a
 // --pods run with many GPUs can't push the charts off screen.
 func (m graphModel) statsLines() []string {
-	all, unit := graphRows(m.runs, m.metrics[m.sel], m.pods)
+	all, unit, _ := graphRows(m.runs, m.metrics[m.sel], m.pods)
 	rows := m.visible(all)
 	const maxLines = 5
 	var out []string
