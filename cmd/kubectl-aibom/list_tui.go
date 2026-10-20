@@ -40,6 +40,7 @@ type listModel struct {
 	w, h     int
 	hoff     int // horizontal scroll offset, reset on every mode change
 	mode     int
+	stripeBG string // escape for zebra-striping alternate list rows ("" = none)
 
 	// focus is the AIBOM(s) the pager or graph currently shows, so g (graph)
 	// and d (detail) can switch between the two views of the same subject.
@@ -385,7 +386,11 @@ func (m listModel) listView() string {
 		if m.selected[i] {
 			sel = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("✓")
 		}
-		b.WriteString(cur + sel + hslice(body[i], m.hoff, vw) + "\n")
+		row := cur + sel + hslice(body[i], m.hoff, vw)
+		if i%2 == 1 { // zebra-stripe alternate rows for readability
+			row = stripeRow(row, m.stripeBG, m.w)
+		}
+		b.WriteString(row + "\n")
 	}
 	b.WriteString(help)
 	if m.status != "" {
@@ -481,6 +486,33 @@ func hslice(s string, off, width int) string {
 	return out.String()
 }
 
+// stripeRow paints a full-width background behind one list row. The row may
+// contain colored cells whose reset (\x1b[0m) would otherwise clear the
+// background mid-line, so each reset re-applies it; the row is padded to width
+// so the stripe spans the whole line.
+func stripeRow(row, bg string, width int) string {
+	if bg == "" {
+		return row
+	}
+	if pad := width - ansi.StringWidth(row); pad > 0 {
+		row += strings.Repeat(" ", pad)
+	}
+	return bg + strings.ReplaceAll(row, ansiReset, ansiReset+bg) + ansiReset
+}
+
+// stripeBG is the background escape for zebra-striped rows: an off-white stripe
+// on light terminals, an off-black one on dark, so alternate rows are easy to
+// track across. Empty when color is disabled.
+func stripeBG() string {
+	if !colorEnabled {
+		return ""
+	}
+	if lipgloss.HasDarkBackground() {
+		return "\x1b[48;5;236m" // off-black
+	}
+	return "\x1b[48;5;254m" // off-white
+}
+
 func runListTUI(items []aibom.AIBOM, client dynamic.Interface, allNS bool, sortBy string) error {
 	m := listModel{
 		items:    items,
@@ -488,6 +520,7 @@ func runListTUI(items []aibom.AIBOM, client dynamic.Interface, allNS bool, sortB
 		allNS:    allNS,
 		sortBy:   sortBy,
 		selected: map[int]bool{},
+		stripeBG: stripeBG(), // resolved once; HasDarkBackground queries the terminal
 	}
 	_, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
 	return err

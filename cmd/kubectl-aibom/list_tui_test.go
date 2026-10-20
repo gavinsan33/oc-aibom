@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -159,6 +160,26 @@ func TestDetailFromFocusPicksCompareForMany(t *testing.T) {
 	(&m).detailFromFocus()
 	if m.mode != modePager || m.pageKind != pageCompare {
 		t.Fatalf("two-run focus → mode %d kind %d, want pager/compare", m.mode, m.pageKind)
+	}
+}
+
+func TestStripeRowReappliesBGAfterReset(t *testing.T) {
+	bg := "\x1b[48;5;236m"
+	got := stripeRow("ab"+ansiReset+"cd", bg, 10) // reset in the middle
+	if !strings.HasPrefix(got, bg) {
+		t.Fatalf("stripe missing leading bg: %q", got)
+	}
+	if !strings.Contains(got, ansiReset+bg) {
+		t.Fatalf("bg not reapplied after an embedded reset: %q", got)
+	}
+	if w := ansi.StringWidth(got); w != 10 {
+		t.Fatalf("stripe width = %d, want 10 (padded)", w)
+	}
+}
+
+func TestStripeRowNoBGIsPassthrough(t *testing.T) {
+	if got := stripeRow("abc", "", 10); got != "abc" {
+		t.Fatalf("empty bg should pass through unchanged, got %q", got)
 	}
 }
 
