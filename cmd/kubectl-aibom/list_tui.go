@@ -398,16 +398,13 @@ func (m listModel) pagerView() string {
 	end := min(len(m.pageLines), m.pageOff+bodyH)
 	title := lipgloss.NewStyle().Bold(true).Render(m.pageTitle)
 
-	keys := " ↑↓ ←→ scroll · g graph · q back"
-	if m.pageKind == pageCompare {
-		keys = " ↑↓ ←→ scroll · g graph · c changed · q back"
-	}
 	footer := lipgloss.NewStyle().Faint(true).Render(
-		fmt.Sprintf("%s · %d-%d/%d", keys, m.pageOff+1, end, len(m.pageLines)))
-	// The --changed state goes on its own line so it is never pushed off the
-	// right edge of a narrow terminal.
+		fmt.Sprintf(" ↑↓ ←→ scroll · g graph · q back · %d-%d/%d", m.pageOff+1, end, len(m.pageLines)))
+	// The --changed toggle and its state get their own line so the hint is
+	// clear and never pushed off the right edge of a narrow terminal.
 	if m.pageKind == pageCompare {
-		footer += "\n " + changedIndicator(m.pageChanged)
+		key := lipgloss.NewStyle().Bold(true).Render("c")
+		footer += "\n " + key + " " + changedIndicator(m.pageChanged)
 	}
 	if m.status != "" {
 		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" "+m.status)
