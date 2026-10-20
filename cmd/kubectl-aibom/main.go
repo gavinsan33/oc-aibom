@@ -843,37 +843,59 @@ func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
 		fmt.Fprintln(w, faint("  * field differs across runs"))
 	}
 
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, bold("Hardware Performance:"))
 	twoWay := len(items) == 2
 	var extra []cell
 	if twoWay {
 		extra = []cell{coloredCell("DELTA", bold("DELTA")), coloredCell("CHANGE", bold("CHANGE"))}
 	}
-	rows = runHeader("METRIC", extra...)
-	for _, mr := range aibom.ComparePerformance(items, telemetryMetricOrder) {
-		cells := []cell{labelCell(telemetryMetricLabels[mr.Key])}
-		for i := range items {
-			text := "-"
-			if mr.Available[i] {
-				text = strings.TrimSpace(fmt.Sprintf("%s %s", formatMetric(mr.Values[i]), mr.Unit))
+
+	perfTable := func(title string, labels map[string]string, metricRows []aibom.MetricRow) {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, bold(title+":"))
+		rows := runHeader("METRIC", extra...)
+		for _, mr := range metricRows {
+			cells := []cell{labelCell(labels[mr.Key])}
+			for i := range items {
+				text := "-"
+				if mr.Available[i] {
+					text = strings.TrimSpace(fmt.Sprintf("%s %s", formatMetric(mr.Values[i]), mr.Unit))
+				}
+				cells = append(cells, runCell(i, text))
 			}
-			cells = append(cells, runCell(i, text))
+			if twoWay {
+				deltaText, changeText := "-", "N/A"
+				deltaCell, changeCell := plainCell(deltaText), plainCell(changeText)
+				if mr.Delta != nil {
+					deltaText = fmt.Sprintf("%+.2f", *mr.Delta)
+					deltaCell = coloredCell(deltaText, colorBySign(*mr.Delta, deltaText))
+				}
+				if mr.PctChange != nil {
+					changeText = formatPctChange(*mr.PctChange)
+					changeCell = coloredCell(changeText, colorBySign(*mr.PctChange, changeText))
+				}
+				cells = append(cells, deltaCell, changeCell)
+			}
+			rows = append(rows, cells)
 		}
-		if twoWay {
-			deltaText, changeText := "-", "N/A"
-			deltaCell, changeCell := plainCell(deltaText), plainCell(changeText)
-			if mr.Delta != nil {
-				deltaText = fmt.Sprintf("%+.2f", *mr.Delta)
-				deltaCell = coloredCell(deltaText, colorBySign(*mr.Delta, deltaText))
-			}
-			if mr.PctChange != nil {
-				changeText = formatPctChange(*mr.PctChange)
-				changeCell = coloredCell(changeText, colorBySign(*mr.PctChange, changeText))
-			}
-			cells = append(cells, deltaCell, changeCell)
-		}
-		rows = append(rows, cells)
+		writeTable(w, rows)
 	}
-	writeTable(w, rows)
+
+	perfTable("Hardware Performance", telemetryMetricLabels, aibom.ComparePerformance(items, telemetryMetricOrder))
+
+	// Only shown when some run carries inference telemetry; otherwise every row
+	// is "—" and the table is noise for non-vLLM workloads.
+	if anyInferenceMetrics(items) {
+		perfTable("Inference Performance", vllmMetricLabels, aibom.CompareInferencePerformance(items, vllmMetricOrder))
+	}
+}
+
+// anyInferenceMetrics reports whether at least one run has vLLM serving
+// telemetry (an inference.performance.metrics map).
+func anyInferenceMetrics(items []aibom.AIBOM) bool {
+	for _, a := range items {
+		if a.Data.Inference != nil && a.Data.Inference.Performance != nil && len(a.Data.Inference.Performance.Metrics) > 0 {
+			return true
+		}
+	}
+	return false
 }

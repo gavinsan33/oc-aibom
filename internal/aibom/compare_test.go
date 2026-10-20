@@ -96,3 +96,18 @@ func TestComparePerformanceUnavailableOnNote(t *testing.T) {
 		t.Fatalf("availability = %v, want [false true]", r.Available)
 	}
 }
+
+func TestCompareInferencePerformance(t *testing.T) {
+	// a has vLLM serving metrics; b has no inference block at all.
+	a := AIBOM{Data: Data{Inference: &Inference{Performance: &InferencePerformance{
+		Metrics: map[string]MetricStats{"generation_throughput": {Avg: 120, Unit: "tokens/s"}},
+	}}}}
+	b := AIBOM{}
+	r := CompareInferencePerformance([]AIBOM{a, b}, []string{"generation_throughput"})[0]
+	if r.Values[0] != 120 || r.Unit != "tokens/s" {
+		t.Fatalf("row = %+v, want value 120 unit tokens/s", r)
+	}
+	if !r.Available[0] || r.Available[1] {
+		t.Fatalf("availability = %v, want [true false]", r.Available)
+	}
+}
