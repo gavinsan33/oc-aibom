@@ -327,10 +327,11 @@ func (m *listModel) detailFromFocus() {
 	}
 }
 
-// pagerFooterH counts the footer lines below the pager body: the key line,
-// plus the compare --changed indicator and any status line, each on its own row.
+// pagerFooterH counts the footer lines below the pager body: a blank separator
+// and the key line, plus the compare --changed indicator and any status line,
+// each on its own row.
 func (m listModel) pagerFooterH() int {
-	h := 1
+	h := 2 // blank separator + key line
 	if m.pageKind == pageCompare {
 		h++
 	}
@@ -403,8 +404,7 @@ func (m listModel) pagerView() string {
 	// The --changed toggle and its state get their own line so the hint is
 	// clear and never pushed off the right edge of a narrow terminal.
 	if m.pageKind == pageCompare {
-		key := lipgloss.NewStyle().Bold(true).Render("c")
-		footer += "\n " + key + " " + changedIndicator(m.pageChanged)
+		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" c · ") + changedIndicator(m.pageChanged)
 	}
 	if m.status != "" {
 		footer += "\n" + lipgloss.NewStyle().Faint(true).Render(" "+m.status)
@@ -414,7 +414,8 @@ func (m listModel) pagerView() string {
 	for _, l := range m.pageLines[m.pageOff:end] {
 		visible = append(visible, hslice(l, m.hoff, m.w))
 	}
-	return title + "\n" + strings.Join(visible, "\n") + "\n" + footer
+	// Blank separator between the content and the footer tips.
+	return title + "\n" + strings.Join(visible, "\n") + "\n\n" + footer
 }
 
 // changedIndicator is the bottom-of-screen toggle state for compare's
