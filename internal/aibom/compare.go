@@ -81,19 +81,39 @@ type MetricRow struct {
 }
 
 // ComparePerformance builds one MetricRow per key (keys given in display
-// order), averaging each metric across the runs. For exactly two runs it also
-// quantifies the change, matching the console plugin's pairwise Delta/Change
-// columns.
+// order), averaging each hardware (resource_utilization) metric across the
+// runs. For exactly two runs it also quantifies the change, matching the
+// console plugin's pairwise Delta/Change columns.
 func ComparePerformance(items []AIBOM, keys []string) []MetricRow {
+	return comparePerformance(items, keys, func(a AIBOM, k string) (float64, bool, string) {
+		ru := a.Data.ResourceUtilization
+		return ru.MetricAvg(k), ru.Note == "", ru.Metrics[k].Unit
+	})
+}
+
+// CompareInferencePerformance is ComparePerformance over inference.performance
+// (vLLM serving) metrics instead of hardware ones. A run is "available" only
+// when it carries inference performance metrics -- an AIBOM with no inference
+// block (or a non-vLLM engine) shows "—" for every inference metric.
+func CompareInferencePerformance(items []AIBOM, keys []string) []MetricRow {
+	return comparePerformance(items, keys, func(a AIBOM, k string) (float64, bool, string) {
+		if a.Data.Inference == nil || a.Data.Inference.Performance == nil {
+			return 0, false, ""
+		}
+		m := a.Data.Inference.Performance.Metrics
+		return m[k].Avg, len(m) > 0, m[k].Unit
+	})
+}
+
+func comparePerformance(items []AIBOM, keys []string, metric func(AIBOM, string) (avg float64, available bool, unit string)) []MetricRow {
 	rows := make([]MetricRow, 0, len(keys))
 	for _, k := range keys {
 		r := MetricRow{Key: k, Values: make([]float64, len(items)), Available: make([]bool, len(items))}
 		for i, a := range items {
-			ru := a.Data.ResourceUtilization
-			r.Values[i] = ru.MetricAvg(k)
-			r.Available[i] = ru.Note == ""
+			var unit string
+			r.Values[i], r.Available[i], unit = metric(a, k)
 			if r.Unit == "" {
-				r.Unit = ru.Metrics[k].Unit
+				r.Unit = unit
 			}
 		}
 		if len(items) == 2 {
