@@ -107,7 +107,7 @@ func seriesStats(pts [][2]float64) (min, avg, max float64) {
 // run has (hardware, then inference, then unknown ones sorted), or only the
 // named ones, which must exist in at least one run.
 func graphMetricKeys(runs []graphRun, only []string) ([]string, error) {
-	order := append(append([]string{}, telemetryMetricOrder...), vllmMetricOrder...)
+	order := append(append([]string{}, telemetryMetricOrder...), servingMetricOrder...)
 	known := map[string]bool{}
 	for _, k := range order {
 		known[k] = true
@@ -151,7 +151,7 @@ func graphMetricLabel(k string) string {
 	if l := telemetryMetricLabels[k]; l != "" {
 		return l
 	}
-	if l := vllmMetricLabels[k]; l != "" {
+	if l := servingMetricLabels[k]; l != "" {
 		return l
 	}
 	return k

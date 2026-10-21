@@ -354,17 +354,17 @@ var telemetryMetricLabels = map[string]string{
 	"network_transmit":         "Network TX",
 }
 
-// vllmMetricOrder and vllmMetricLabels are inference.performance's analog of
-// telemetryMetricOrder/telemetryMetricLabels above -- vLLM's own
-// serving-level metrics (aibom-webhook-service's VLLM_TELEMETRY_QUERIES),
-// not DCGM/cAdvisor hardware metrics.
-var vllmMetricOrder = []string{
+// servingMetricOrder and servingMetricLabels are inference.performance's analog of
+// telemetryMetricOrder/telemetryMetricLabels above -- the serving engine's own
+// metrics (aibom-webhook-service's SERVING_TELEMETRY_QUERIES), not
+// DCGM/cAdvisor hardware metrics.
+var servingMetricOrder = []string{
 	"time_to_first_token_seconds", "inter_token_latency_seconds",
 	"num_requests_running", "num_requests_waiting",
 	"kv_cache_usage", "prompt_throughput", "generation_throughput",
 }
 
-var vllmMetricLabels = map[string]string{
+var servingMetricLabels = map[string]string{
 	"time_to_first_token_seconds": "TTFT",
 	"inter_token_latency_seconds": "ITL",
 	"num_requests_running":        "Requests Running",
@@ -650,7 +650,7 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 			}
 		}
 		if perf := inf.Performance; perf != nil && len(perf.Metrics) > 0 {
-			printMetricsSection(w, "Inference Performance", perf.Metrics, vllmMetricOrder, vllmMetricLabels, perf.SummaryIncludesColdStart, brief)
+			printMetricsSection(w, "Inference Performance", perf.Metrics, servingMetricOrder, servingMetricLabels, perf.SummaryIncludesColdStart, brief)
 		}
 	}
 
@@ -703,13 +703,13 @@ func boolStr(b bool) string {
 // metric in metrics -- detail a flat average can't show, e.g. whether GPU
 // utilization held steady or throttled down partway through the run. Silent
 // no-op if metrics is empty (an AIBOM predating the field, or an inference
-// AIBOM with no vLLM telemetry). Rendered as a table (not manually padded
+// AIBOM with no serving telemetry). Rendered as a table (not manually padded
 // Printf columns) since the values span wildly different magnitudes across
 // metrics (e.g. "28.00" vs "20500.00"), which fixed-width padding can't keep
 // aligned. Generic over order/labels so both ResourceUtilization (hardware
-// metrics) and InferencePerformance (vLLM's own serving metrics) share this
+// metrics) and InferencePerformance (the serving engine's metrics) share this
 // rendering despite having different known metric-name sets -- see
-// telemetryMetricOrder/telemetryMetricLabels vs. vllmMetricOrder/vllmMetricLabels.
+// telemetryMetricOrder/telemetryMetricLabels vs. servingMetricOrder/servingMetricLabels.
 func printMetricDetail(w io.Writer, metrics map[string]aibom.MetricStats, order []string, labels map[string]string) {
 	if len(metrics) == 0 {
 		return
@@ -883,13 +883,13 @@ func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
 	perfTable("Hardware Performance", telemetryMetricLabels, aibom.ComparePerformance(items, telemetryMetricOrder))
 
 	// Only shown when some run carries inference telemetry; otherwise every row
-	// is "—" and the table is noise for non-vLLM workloads.
+	// is "—" and the table is noise for non-serving workloads.
 	if anyInferenceMetrics(items) {
-		perfTable("Inference Performance", vllmMetricLabels, aibom.CompareInferencePerformance(items, vllmMetricOrder))
+		perfTable("Inference Performance", servingMetricLabels, aibom.CompareInferencePerformance(items, servingMetricOrder))
 	}
 }
 
-// anyInferenceMetrics reports whether at least one run has vLLM serving
+// anyInferenceMetrics reports whether at least one run has serving-engine
 // telemetry (an inference.performance.metrics map).
 func anyInferenceMetrics(items []aibom.AIBOM) bool {
 	for _, a := range items {
