@@ -223,14 +223,16 @@ type Inference struct {
 	EnforceEager        any    `json:"enforce_eager,omitempty"`
 	EnablePrefixCaching any    `json:"enable_prefix_caching,omitempty"`
 	// Performance is nil on an AIBOM predating this field, or whenever the
-	// workload's serving_engine isn't one VLLM_TELEMETRY_QUERIES covers (only
-	// vLLM today) -- see aibom-webhook-service's CLAUDE.md, "Inference
-	// Performance Telemetry".
+	// workload's serving_engine isn't one SERVING_TELEMETRY_QUERIES covers
+	// (vLLM/llm-d, TGI, SGLang, LMDeploy) -- see aibom-webhook-service's
+	// CLAUDE.md, "Inference Performance Telemetry".
 	Performance *InferencePerformance `json:"performance,omitempty"`
 }
 
-// InferencePerformance is vLLM's own serving-level telemetry (TTFT, ITL,
-// queue depth, KV-cache usage, throughput) -- a separate top-level concern
+// InferencePerformance is the serving engine's own serving-level telemetry
+// (TTFT, ITL, queue depth, KV-cache usage, throughput), under the same metric
+// keys for every engine; an engine that doesn't export one (TGI has no TTFT,
+// KV-cache or prompt throughput) just omits that key. A separate top-level concern
 // from ResourceUtilization, which only covers hardware (GPU/CPU/network).
 // Deliberately the same Metrics map[string]MetricStats shape as
 // ResourceUtilization so the same min/max/avg/p95/segments rendering

@@ -92,16 +92,18 @@ func ComparePerformance(items []AIBOM, keys []string) []MetricRow {
 }
 
 // CompareInferencePerformance is ComparePerformance over inference.performance
-// (vLLM serving) metrics instead of hardware ones. A run is "available" only
-// when it carries inference performance metrics -- an AIBOM with no inference
-// block (or a non-vLLM engine) shows "—" for every inference metric.
+// (serving-engine) metrics instead of hardware ones. Availability is per
+// metric, not per run: engines export different subsets (TGI has no TTFT,
+// KV-cache or prompt-throughput metric), so a run is "available" for a key
+// only when that key is present. An AIBOM with no inference block shows "—"
+// for every inference metric.
 func CompareInferencePerformance(items []AIBOM, keys []string) []MetricRow {
 	return comparePerformance(items, keys, func(a AIBOM, k string) (float64, bool, string) {
 		if a.Data.Inference == nil || a.Data.Inference.Performance == nil {
 			return 0, false, ""
 		}
-		m := a.Data.Inference.Performance.Metrics
-		return m[k].Avg, len(m) > 0, m[k].Unit
+		m, ok := a.Data.Inference.Performance.Metrics[k]
+		return m.Avg, ok, m.Unit
 	})
 }
 
@@ -116,7 +118,8 @@ func comparePerformance(items []AIBOM, keys []string, metric func(AIBOM, string)
 				r.Unit = unit
 			}
 		}
-		if len(items) == 2 {
+		// No delta against a run without data: its 0 is a placeholder.
+		if len(items) == 2 && r.Available[0] && r.Available[1] {
 			delta := r.Values[1] - r.Values[0]
 			r.Delta = &delta
 			if r.Values[0] != 0 {
