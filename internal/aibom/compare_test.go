@@ -34,8 +34,8 @@ func TestCompareFieldsModelVersion(t *testing.T) {
 }
 
 func TestCompareFieldsDatasetDrift(t *testing.T) {
-	a := AIBOM{Data: Data{Dataset: Dataset{AutoDetected: []AutoDetectedDataset{{MatchesDeclared: true}}}}}
-	b := AIBOM{Data: Data{Dataset: Dataset{AutoDetected: []AutoDetectedDataset{{MatchesDeclared: false}}}}}
+	a := AIBOM{Data: Data{Dataset: Dataset{AutoDetected: []AutoDetectedDataset{{MatchesDeclared: boolPtr(true)}}}}}
+	b := AIBOM{Data: Data{Dataset: Dataset{AutoDetected: []AutoDetectedDataset{{MatchesDeclared: boolPtr(false)}}}}}
 	r, ok := findField(CompareFields([]AIBOM{a, b}), "Dataset Drift")
 	if !ok || !r.Differs || r.Values[0] != "false" || r.Values[1] != "true" {
 		t.Fatalf("Dataset Drift row = %+v, want differs false/true", r)

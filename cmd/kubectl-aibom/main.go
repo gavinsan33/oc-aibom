@@ -592,8 +592,13 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		a.Data.Dataset.Declared.Name, a.Data.Dataset.Declared.Version,
 		a.Data.Dataset.Declared.License, a.Data.Dataset.Declared.DeclaredVia)
 	for _, d := range a.Data.Dataset.AutoDetected {
-		match := green("matches declared")
-		if !d.MatchesDeclared {
+		var match string
+		switch {
+		case d.MatchesDeclared == nil:
+			match = faint("not reconciled (declared inferred from runtime)")
+		case *d.MatchesDeclared:
+			match = green("matches declared")
+		default:
 			match = red("DOES NOT MATCH DECLARED")
 		}
 		fmt.Fprintf(w, "  Auto-detected: %s %s (license: %s, seen via: %s) — %s\n", d.DatasetName, d.Version, d.License, strings.Join(d.SeenVia, ", "), match)

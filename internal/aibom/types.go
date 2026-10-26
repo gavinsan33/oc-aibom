@@ -168,10 +168,13 @@ type DeclaredDataset struct {
 }
 
 type AutoDetectedDataset struct {
-	DatasetName     string   `json:"dataset_name"`
-	Version         string   `json:"version"`
-	License         string   `json:"license"`
-	MatchesDeclared bool     `json:"matches_declared"`
+	DatasetName string `json:"dataset_name"`
+	Version     string `json:"version"`
+	License     string `json:"license"`
+	// Pointer so a JSON null (the detector's "not reconciled" -- declared was
+	// itself inferred from runtime, so there's nothing independent to compare)
+	// is distinct from false (a genuine declared-vs-detected mismatch).
+	MatchesDeclared *bool    `json:"matches_declared"`
 	SeenVia         []string `json:"seen_via"`
 }
 

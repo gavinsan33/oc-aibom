@@ -131,7 +131,8 @@ func comparePerformance(items []AIBOM, keys []string, metric func(AIBOM, string)
 
 func hasDrift(a AIBOM) bool {
 	for _, d := range a.Data.Dataset.AutoDetected {
-		if !d.MatchesDeclared {
+		// nil = not reconciled (declared inferred from runtime), not drift.
+		if d.MatchesDeclared != nil && !*d.MatchesDeclared {
 			return true
 		}
 	}
