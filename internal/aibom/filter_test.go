@@ -16,7 +16,7 @@ func newTestAIBOMs() []AIBOM {
 				Dataset: Dataset{
 					Declared: DeclaredDataset{Name: "alpaca", Version: "1.0", License: "Apache-2.0"},
 					AutoDetected: []AutoDetectedDataset{
-						{DatasetName: "alpaca", Version: "1.0", MatchesDeclared: true},
+						{DatasetName: "alpaca", Version: "1.0", MatchesDeclared: boolPtr(true)},
 					},
 				},
 			},
@@ -33,7 +33,7 @@ func newTestAIBOMs() []AIBOM {
 				Dataset: Dataset{
 					Declared: DeclaredDataset{Name: "alpaca", Version: "1.0", License: "Apache-2.0"},
 					AutoDetected: []AutoDetectedDataset{
-						{DatasetName: "dolly", Version: "2.0", MatchesDeclared: false},
+						{DatasetName: "dolly", Version: "2.0", MatchesDeclared: boolPtr(false)},
 					},
 				},
 			},
@@ -172,3 +172,5 @@ func TestModelNameMatches(t *testing.T) {
 		}
 	}
 }
+
+func boolPtr(b bool) *bool { return &b }

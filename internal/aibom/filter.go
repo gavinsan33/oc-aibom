@@ -77,7 +77,8 @@ func DriftOnly(items []AIBOM) []AIBOM {
 	var out []AIBOM
 	for _, a := range items {
 		for _, d := range a.Data.Dataset.AutoDetected {
-			if !d.MatchesDeclared {
+			// nil = not reconciled (declared inferred from runtime), not drift.
+			if d.MatchesDeclared != nil && !*d.MatchesDeclared {
 				out = append(out, a)
 				break
 			}
