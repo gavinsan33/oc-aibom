@@ -111,3 +111,28 @@ func TestCompareInferencePerformance(t *testing.T) {
 		t.Fatalf("availability = %v, want [true false]", r.Available)
 	}
 }
+
+func TestCompareInferencePerformancePerMetric(t *testing.T) {
+	// TGI exports no TTFT: its row must be unavailable, not a 0 that diffs
+	// as -100% against the vLLM run.
+	vllm := AIBOM{Data: Data{Inference: &Inference{Performance: &InferencePerformance{
+		Metrics: map[string]MetricStats{
+			"time_to_first_token_seconds": {Avg: 0.12, Unit: "seconds"},
+			"generation_throughput":       {Avg: 100, Unit: "tokens_per_sec"},
+		},
+	}}}}
+	tgi := AIBOM{Data: Data{Inference: &Inference{Performance: &InferencePerformance{
+		Metrics: map[string]MetricStats{"generation_throughput": {Avg: 150, Unit: "tokens_per_sec"}},
+	}}}}
+	rows := CompareInferencePerformance([]AIBOM{vllm, tgi}, []string{"time_to_first_token_seconds", "generation_throughput"})
+	ttft, gen := rows[0], rows[1]
+	if !ttft.Available[0] || ttft.Available[1] {
+		t.Fatalf("ttft availability = %v, want [true false]", ttft.Available)
+	}
+	if ttft.Delta != nil || ttft.PctChange != nil {
+		t.Fatalf("ttft should have no delta against a run without it, got %+v", ttft)
+	}
+	if gen.Delta == nil || *gen.Delta != 50 || gen.PctChange == nil || *gen.PctChange != 50 {
+		t.Fatalf("gen row = %+v, want delta 50 / +50%%", gen)
+	}
+}
