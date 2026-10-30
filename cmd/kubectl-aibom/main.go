@@ -588,9 +588,14 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, bold("Dataset:"))
-	fmt.Fprintf(w, "  Declared:      %s %s (license: %s, via: %s)\n",
-		a.Data.Dataset.Declared.Name, a.Data.Dataset.Declared.Version,
-		a.Data.Dataset.Declared.License, a.Data.Dataset.Declared.DeclaredVia)
+	if a.Data.Dataset.Declared.Name == "" && len(a.Data.Dataset.AutoDetected) == 0 {
+		// Inference AIBOMs usually have no dataset block at all.
+		fmt.Fprintln(w, "  "+faint("No dataset was detected for this workload."))
+	} else {
+		fmt.Fprintf(w, "  Declared:      %s %s (license: %s, via: %s)\n",
+			a.Data.Dataset.Declared.Name, a.Data.Dataset.Declared.Version,
+			a.Data.Dataset.Declared.License, a.Data.Dataset.Declared.DeclaredVia)
+	}
 	for _, d := range a.Data.Dataset.AutoDetected {
 		var match string
 		switch {
