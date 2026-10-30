@@ -627,6 +627,9 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		fmt.Fprintf(w, "  Epochs:                 %v\n", t.Epochs)
 		fmt.Fprintf(w, "  Random Seed:            %v\n", t.RandomSeed)
 		fmt.Fprintf(w, "  Parallelization:        %s\n", t.ParallelizationStrategy)
+		for _, l := range trainingExtras(*t) {
+			fmt.Fprintf(w, "  %-23s %s\n", l[0]+":", l[1])
+		}
 	}
 	if ft := a.Data.FineTuning; ft != nil {
 		fmt.Fprintln(w)
