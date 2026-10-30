@@ -27,3 +27,21 @@ func TestEnvironmentExtras(t *testing.T) {
 		t.Fatalf("an AIBOM without these fields should print nothing extra, got %d lines", n)
 	}
 }
+
+func TestEnvironmentExtrasSoftwareVersions(t *testing.T) {
+	got := environmentExtras(aibom.Environment{
+		PythonVersion:    "3.12.16",
+		TorchCUDAVersion: "13.0",
+		CuDNNVersion:     "9.24.0",
+		NCCLVersion:      "2.30.7",
+		Libraries:        map[string]string{"torch": "2.14.1+cu130", "sglang": "0.5.23", "accelerate": "1.15.0"},
+	})
+	want := [][2]string{
+		{"Python", "3.12.16"},
+		{"Torch Build", "CUDA 13.0, cuDNN 9.24.0, NCCL 2.30.7"},
+		{"Libraries", "accelerate 1.15.0, sglang 0.5.23, torch 2.14.1+cu130"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}

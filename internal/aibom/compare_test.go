@@ -1,6 +1,9 @@
 package aibom
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func findField(rows []FieldRow, label string) (FieldRow, bool) {
 	for _, r := range rows {
@@ -49,6 +52,31 @@ func TestCompareFieldsThreeWayDiffers(t *testing.T) {
 	r, _ := findField(CompareFields([]AIBOM{a, b, c}), "GPU Type")
 	if !r.Differs || len(r.Values) != 3 {
 		t.Fatalf("GPU Type across 3 runs = %+v, want differs with 3 values", r)
+	}
+}
+
+func TestCompareFieldsTrainingAndSoftware(t *testing.T) {
+	a := AIBOM{Data: Data{
+		Training:    &Training{Optimizer: "adamw_torch", LRScheduler: &LRScheduler{Type: "cosine"}},
+		Environment: Environment{PythonVersion: "3.12.3", TorchCUDAVersion: "12.8", Libraries: map[string]string{"trl": "0.24.0", "torch": "2.9.0"}},
+	}}
+	b := AIBOM{Data: Data{
+		Training:    &Training{Optimizer: "adamw_torch", LRScheduler: &LRScheduler{Type: "linear"}},
+		Environment: Environment{PythonVersion: "3.12.3", TorchCUDAVersion: "12.8", Libraries: map[string]string{"trl": "0.25.0", "torch": "2.9.0"}},
+	}}
+	inference := AIBOM{} // no training block
+	rows := CompareFields([]AIBOM{a, b, inference})
+	for label, want := range map[string][]string{
+		"Optimizer":          {"adamw_torch", "adamw_torch", ""},
+		"LR Scheduler":       {"cosine", "linear", ""},
+		"Python Version":     {"3.12.3", "3.12.3", ""},
+		"Torch CUDA Version": {"12.8", "12.8", ""},
+		"Libraries":          {"torch 2.9.0, trl 0.24.0", "torch 2.9.0, trl 0.25.0", ""},
+	} {
+		r, ok := findField(rows, label)
+		if !ok || !reflect.DeepEqual(r.Values, want) {
+			t.Errorf("%s row = %+v, want %v", label, r, want)
+		}
 	}
 }
 

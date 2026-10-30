@@ -5,6 +5,8 @@
 package aibom
 
 import (
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -193,6 +195,56 @@ type Training struct {
 	Epochs                  FlexInt   `json:"epochs"`
 	RandomSeed              FlexInt   `json:"random_seed"`
 	ParallelizationStrategy string    `json:"parallelization_strategy"`
+	MixedPrecision          string    `json:"mixed_precision,omitempty"`
+	// All nil on AIBOMs from before the webhook recorded them, and whenever
+	// nothing was observed or declared.
+	OptimizerConfig *OptimizerConfig `json:"optimizer_config,omitempty"`
+	LRScheduler     *LRScheduler     `json:"lr_scheduler,omitempty"`
+	Determinism     *Determinism     `json:"determinism,omitempty"`
+}
+
+// OptimizerConfig is the optimizer the run built (DeclaredVia
+// "runtime_optimizer", from aibom-webhook-service's torch.optim.Optimizer
+// hook) or, failing that, the settings TrainingArguments or the training
+// CLI declared for it ("training_arguments", "cli_arg"). Params holds the
+// settings every param group shares, under torch's names (lr, betas, eps,
+// weight_decay, ...); a setting that differs between groups is in
+// ParamGroups instead, one map per group plus its "param_tensors" count.
+// Loosely typed: the key set depends on the optimizer class.
+type OptimizerConfig struct {
+	Class       string           `json:"class,omitempty"`
+	Params      map[string]any   `json:"params,omitempty"`
+	ParamGroups []map[string]any `json:"param_groups,omitempty"`
+	OptimArgs   string           `json:"optim_args,omitempty"`
+	DeclaredVia string           `json:"declared_via,omitempty"`
+}
+
+// LRScheduler comes from TrainingArguments or the training CLI. WarmupSteps
+// is a float because transformers 5 accepts a fraction of training steps there.
+type LRScheduler struct {
+	Type        string   `json:"type,omitempty"`
+	WarmupRatio *float64 `json:"warmup_ratio,omitempty"`
+	WarmupSteps *float64 `json:"warmup_steps,omitempty"`
+	DeclaredVia string   `json:"declared_via,omitempty"`
+}
+
+// Determinism is what the run's reproducibility depends on. Seeds maps a
+// generator ("python", "numpy", "torch") to its most recent explicit seed,
+// an int or (for a string seed, or an int past 2^53) a string, so values are
+// `any`. SeedHistory lists a generator's distinct seeds in the order first
+// seen, only when it was seeded with more than one. The flag pointers are
+// nil when not captured, which isn't the same as false.
+type Determinism struct {
+	Seeds                           map[string]any   `json:"seeds,omitempty"`
+	SeedHistory                     map[string][]any `json:"seed_history,omitempty"`
+	DataSeed                        any              `json:"data_seed,omitempty"`
+	FullDeterminism                 bool             `json:"full_determinism,omitempty"`
+	CudnnDeterministic              *bool            `json:"cudnn_deterministic,omitempty"`
+	CudnnBenchmark                  *bool            `json:"cudnn_benchmark,omitempty"`
+	DeterministicAlgorithms         *bool            `json:"deterministic_algorithms,omitempty"`
+	DeterministicAlgorithmsWarnOnly bool             `json:"deterministic_algorithms_warn_only,omitempty"`
+	CublasWorkspaceConfig           string           `json:"cublas_workspace_config,omitempty"`
+	PythonHashSeed                  string           `json:"python_hash_seed,omitempty"`
 }
 
 type FineTuning struct {
@@ -269,6 +321,31 @@ type Environment struct {
 	Network      map[string]any `json:"network,omitempty"`
 	Storage      map[string]any `json:"storage,omitempty"`
 	KernelConfig map[string]any `json:"kernel_config,omitempty"`
+	// From the workload's own Python process rather than discovery (also
+	// absent on older AIBOMs). Libraries lists only what the process
+	// imported. CUDAVersion above is the newest CUDA the driver supports;
+	// TorchCUDAVersion is the toolkit torch was built against.
+	PythonVersion    string            `json:"python_version,omitempty"`
+	Libraries        map[string]string `json:"libraries,omitempty"`
+	TorchCUDAVersion string            `json:"torch_cuda_version,omitempty"`
+	TorchHIPVersion  string            `json:"torch_hip_version,omitempty"`
+	CuDNNVersion     string            `json:"cudnn_version,omitempty"`
+	NCCLVersion      string            `json:"nccl_version,omitempty"`
+}
+
+// LibraryList renders Libraries as "name version, ..." sorted by name, the
+// same string the console plugin compares.
+func (e Environment) LibraryList() string {
+	names := make([]string, 0, len(e.Libraries))
+	for n := range e.Libraries {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	parts := make([]string, len(names))
+	for i, n := range names {
+		parts[i] = n + " " + e.Libraries[n]
+	}
+	return strings.Join(parts, ", ")
 }
 
 type ResourceUtilization struct {

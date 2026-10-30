@@ -7,8 +7,10 @@ import (
 	"github.com/gsanders/oc-aibom/internal/aibom"
 )
 
-// environmentExtras returns the optional discovery lines (label, value) for
-// `describe`, skipping anything absent so an older AIBOM prints nothing extra.
+// environmentExtras returns the optional environment lines (label, value) for
+// `describe` -- discovery details, then the software versions the workload's
+// own process reported -- skipping anything absent so an older AIBOM prints
+// nothing extra.
 func environmentExtras(e aibom.Environment) [][2]string {
 	var out [][2]string
 	add := func(label string, parts ...string) {
@@ -46,6 +48,11 @@ func environmentExtras(e aibom.Environment) [][2]string {
 		labeled("NUMA balancing", get(e.KernelConfig, "numa_balancing")),
 		labeled("THP", get(e.KernelConfig, "transparent_hugepages")),
 		labeled("max_map_count", get(e.KernelConfig, "max_map_count")))
+	add("Python", e.PythonVersion)
+	// CUDA/Driver above is the driver's; this is what torch was built with.
+	add("Torch Build", labeled("CUDA", e.TorchCUDAVersion), labeled("HIP", e.TorchHIPVersion),
+		labeled("cuDNN", e.CuDNNVersion), labeled("NCCL", e.NCCLVersion))
+	add("Libraries", e.LibraryList())
 	return out
 }
 

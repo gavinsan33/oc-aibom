@@ -39,11 +39,26 @@ var compareFieldAccessors = []fieldAccessor{
 	{"Git Commit", func(a AIBOM) string { return a.Data.SourceCode.GitCommit }},
 	{"Git Branch", func(a AIBOM) string { return a.Data.SourceCode.GitBranch }},
 	{"Dirty", func(a AIBOM) string { return fmt.Sprintf("%v", a.Data.SourceCode.Dirty) }},
+	{"Optimizer", func(a AIBOM) string {
+		if a.Data.Training == nil {
+			return ""
+		}
+		return a.Data.Training.Optimizer
+	}},
+	{"LR Scheduler", func(a AIBOM) string {
+		if a.Data.Training == nil || a.Data.Training.LRScheduler == nil {
+			return ""
+		}
+		return a.Data.Training.LRScheduler.Type
+	}},
 	{"GPU Type", func(a AIBOM) string { return a.Data.Environment.GPUType }},
 	{"GPU Count", func(a AIBOM) string { return fmt.Sprintf("%d", a.Data.Environment.GPUCount) }},
 	{"CUDA Version", func(a AIBOM) string { return a.Data.Environment.CUDAVersion }},
 	{"Driver Version", func(a AIBOM) string { return a.Data.Environment.DriverVersion }},
 	{"Framework Version", func(a AIBOM) string { return a.Data.Environment.FrameworkVersion }},
+	{"Python Version", func(a AIBOM) string { return a.Data.Environment.PythonVersion }},
+	{"Torch CUDA Version", func(a AIBOM) string { return a.Data.Environment.TorchCUDAVersion }},
+	{"Libraries", func(a AIBOM) string { return a.Data.Environment.LibraryList() }},
 	{"AIBOM Version", func(a AIBOM) string { return a.Data.Metadata.AIBOMVersion }},
 }
 
