@@ -82,8 +82,9 @@ func CompareFields(items []AIBOM) []FieldRow {
 }
 
 // MetricRow is one resource_utilization metric's average compared across N
-// AIBOMs. Available[i] is false when run i's resource_utilization.note is set
-// (its avg is meaningless, shown as "—"). Delta and PctChange are only
+// AIBOMs. Available[i] is false when run i has no value for the metric --
+// resource_utilization.note is set, or the metric was never collected -- so its
+// avg is a meaningless 0, shown as "-". Delta and PctChange are only
 // populated for a two-run comparison (B relative to A); PctChange is nil when
 // the baseline avg is zero.
 type MetricRow struct {
@@ -102,7 +103,8 @@ type MetricRow struct {
 func ComparePerformance(items []AIBOM, keys []string) []MetricRow {
 	return comparePerformance(items, keys, func(a AIBOM, k string) (float64, bool, string) {
 		ru := a.Data.ResourceUtilization
-		return ru.MetricAvg(k), ru.Note == "", ru.Metrics[k].Unit
+		m, ok := ru.Metrics[k]
+		return ru.MetricAvg(k), ru.Note == "" && ok, m.Unit
 	})
 }
 
