@@ -291,6 +291,13 @@ func (m graphModel) panel(k string, selected bool, w, h int) string {
 		limit = 0
 	}
 	lo, hi := graphRange(all)
+	// Reach the limit too, or a limit above every sample (the usual case: a CPU
+	// or memory limit well over usage) is out of range and never drawn. Hiding
+	// it with t drops this, so the chart rescales to the data -- as the console's
+	// "Show limits" switch does.
+	if limit > 0 {
+		hi = max(hi, limit*1.05)
+	}
 	border := lipgloss.Color("8")
 	if selected {
 		border = lipgloss.Color("6")
