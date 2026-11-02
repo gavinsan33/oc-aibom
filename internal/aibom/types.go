@@ -190,10 +190,11 @@ type Dataset struct {
 // int()/float() conversion instead of dropping the field.
 type Training struct {
 	Optimizer               string    `json:"optimizer"`
-	LearningRate            FlexFloat `json:"learning_rate"`
-	BatchSize               FlexInt   `json:"batch_size"`
-	Epochs                  FlexInt   `json:"epochs"`
-	RandomSeed              FlexInt   `json:"random_seed"`
+	// Pointers so a JSON null (not recorded) stays distinguishable from 0.
+	LearningRate            *FlexFloat `json:"learning_rate"`
+	BatchSize               *FlexInt   `json:"batch_size"`
+	Epochs                  *FlexInt   `json:"epochs"`
+	RandomSeed              *FlexInt   `json:"random_seed"`
 	ParallelizationStrategy string    `json:"parallelization_strategy"`
 	MixedPrecision          string    `json:"mixed_precision,omitempty"`
 	// All nil on AIBOMs from before the webhook recorded them, and whenever
@@ -249,8 +250,8 @@ type Determinism struct {
 
 type FineTuning struct {
 	AdaptationMethod string  `json:"adaptation_method"`
-	LoRARank         FlexInt `json:"lora_rank"`
-	LoRAAlpha        FlexInt `json:"lora_alpha"`
+	LoRARank         *FlexInt `json:"lora_rank"`
+	LoRAAlpha        *FlexInt `json:"lora_alpha"`
 }
 
 // Inference's numeric fields (other than MaxTokens, which is always parsed
@@ -259,16 +260,18 @@ type FineTuning struct {
 // string on a failed conversion.
 type Inference struct {
 	ServingEngine        string    `json:"serving_engine"`
-	MaxModelLen          FlexInt   `json:"max_model_len"`
-	TensorParallelSize   FlexInt   `json:"tensor_parallel_size"`
-	PipelineParallelSize FlexInt   `json:"pipeline_parallel_size"`
-	EnableExpertParallel bool      `json:"enable_expert_parallel"`
-	DataParallelSize     FlexInt   `json:"data_parallel_size"`
-	GPUMemoryUtilization FlexFloat `json:"gpu_memory_utilization"`
-	Temperature          FlexFloat `json:"temperature"`
-	TopP                 FlexFloat `json:"top_p"`
-	TopK                 FlexInt   `json:"top_k"`
-	MaxTokens            int       `json:"max_tokens"`
+	// Pointers so a JSON null (the setting wasn't passed) stays distinguishable
+	// from a real 0/false -- describe prints "-" for nil instead of "0".
+	MaxModelLen          *FlexInt   `json:"max_model_len"`
+	TensorParallelSize   *FlexInt   `json:"tensor_parallel_size"`
+	PipelineParallelSize *FlexInt   `json:"pipeline_parallel_size"`
+	EnableExpertParallel *bool      `json:"enable_expert_parallel"`
+	DataParallelSize     *FlexInt   `json:"data_parallel_size"`
+	GPUMemoryUtilization *FlexFloat `json:"gpu_memory_utilization"`
+	Temperature          *FlexFloat `json:"temperature"`
+	TopP                 *FlexFloat `json:"top_p"`
+	TopK                 *FlexInt   `json:"top_k"`
+	MaxTokens            *FlexInt   `json:"max_tokens"`
 	// Parsed from the vLLM command line; nil when the flag wasn't passed
 	// (so seed 0 and "no seed" stay distinguishable).
 	ServedModelName     string `json:"served_model_name,omitempty"`

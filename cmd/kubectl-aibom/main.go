@@ -622,10 +622,10 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, bold("Training:"))
 		fmt.Fprintf(w, "  Optimizer:              %s\n", t.Optimizer)
-		fmt.Fprintf(w, "  Learning Rate:          %v\n", t.LearningRate)
-		fmt.Fprintf(w, "  Batch Size:             %v\n", t.BatchSize)
-		fmt.Fprintf(w, "  Epochs:                 %v\n", t.Epochs)
-		fmt.Fprintf(w, "  Random Seed:            %v\n", t.RandomSeed)
+		fmt.Fprintf(w, "  Learning Rate:          %s\n", optional(t.LearningRate))
+		fmt.Fprintf(w, "  Batch Size:             %s\n", optional(t.BatchSize))
+		fmt.Fprintf(w, "  Epochs:                 %s\n", optional(t.Epochs))
+		fmt.Fprintf(w, "  Random Seed:            %s\n", optional(t.RandomSeed))
 		fmt.Fprintf(w, "  Parallelization:        %s\n", t.ParallelizationStrategy)
 		for _, l := range trainingExtras(*t) {
 			fmt.Fprintf(w, "  %-23s %s\n", l[0]+":", l[1])
@@ -635,18 +635,18 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, bold("Fine-Tuning:"))
 		fmt.Fprintf(w, "  Adaptation Method: %s\n", ft.AdaptationMethod)
-		fmt.Fprintf(w, "  LoRA Rank/Alpha:   %v / %v\n", ft.LoRARank, ft.LoRAAlpha)
+		fmt.Fprintf(w, "  LoRA Rank/Alpha:   %s / %s\n", optional(ft.LoRARank), optional(ft.LoRAAlpha))
 	}
 	if inf := a.Data.Inference; inf != nil {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, bold("Inference:"))
 		fmt.Fprintf(w, "  Serving Engine:       %s\n", inf.ServingEngine)
-		fmt.Fprintf(w, "  Max Model Len:        %v\n", inf.MaxModelLen)
-		fmt.Fprintf(w, "  Tensor/Pipeline/Data Parallel: %v / %v / %v\n", inf.TensorParallelSize, inf.PipelineParallelSize, inf.DataParallelSize)
-		fmt.Fprintf(w, "  Expert Parallel:      %s\n", boolStr(inf.EnableExpertParallel))
-		fmt.Fprintf(w, "  GPU Memory Util:      %v\n", inf.GPUMemoryUtilization)
-		fmt.Fprintf(w, "  Temperature/TopP/TopK: %v / %v / %v\n", inf.Temperature, inf.TopP, inf.TopK)
-		fmt.Fprintf(w, "  Max Tokens:           %d\n", inf.MaxTokens)
+		fmt.Fprintf(w, "  Max Model Len:        %s\n", optional(inf.MaxModelLen))
+		fmt.Fprintf(w, "  Tensor/Pipeline/Data Parallel: %s / %s / %s\n", optional(inf.TensorParallelSize), optional(inf.PipelineParallelSize), optional(inf.DataParallelSize))
+		fmt.Fprintf(w, "  Expert Parallel:      %s\n", optional(inf.EnableExpertParallel))
+		fmt.Fprintf(w, "  GPU Memory Util:      %s\n", optional(inf.GPUMemoryUtilization))
+		fmt.Fprintf(w, "  Temperature/TopP/TopK: %s / %s / %s\n", optional(inf.Temperature), optional(inf.TopP), optional(inf.TopK))
+		fmt.Fprintf(w, "  Max Tokens:           %s\n", optional(inf.MaxTokens))
 		if inf.ServedModelName != "" {
 			fmt.Fprintf(w, "  Served Model Name:    %s\n", inf.ServedModelName)
 		}
@@ -706,6 +706,16 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		fmt.Fprintf(w, "  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
 		fmt.Fprintf(w, "  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
 	}
+}
+
+// optional renders a setting the webhook may record as JSON null: "-" when
+// unset, rather than the zero value a non-pointer field would decode it to
+// ("Tensor/Pipeline/Data Parallel: 0 / 0 / 0" for a server that never set them).
+func optional[T any](p *T) string {
+	if p == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%v", *p)
 }
 
 func boolStr(b bool) string {
