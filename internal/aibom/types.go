@@ -197,6 +197,11 @@ type Training struct {
 	RandomSeed              *FlexInt   `json:"random_seed"`
 	ParallelizationStrategy string     `json:"parallelization_strategy"`
 	MixedPrecision          string     `json:"mixed_precision,omitempty"`
+	// How MixedPrecision was found: "accelerator", "deepspeed", "fsdp",
+	// "training_arguments", "fp8_hook", "autocast", "accelerate_env" or
+	// "cli_arg".
+	MixedPrecisionDeclaredVia string     `json:"mixed_precision_declared_via,omitempty"`
+	Precision                 *Precision `json:"precision,omitempty"`
 	// All nil on AIBOMs from before the webhook recorded them, and whenever
 	// nothing was observed or declared.
 	OptimizerConfig *OptimizerConfig `json:"optimizer_config,omitempty"`
@@ -218,6 +223,38 @@ type OptimizerConfig struct {
 	ParamGroups []map[string]any `json:"param_groups,omitempty"`
 	OptimArgs   string           `json:"optim_args,omitempty"`
 	DeclaredVia string           `json:"declared_via,omitempty"`
+}
+
+// Precision is the numerical-precision detail aibom-webhook-service's
+// runtime hooks saw: the TF32 switches (nil when not captured, which isn't
+// the same as false), each distinct enabled torch.autocast "device:dtype",
+// FP8 training, an FSDP mixed-precision policy, and DeepSpeed's bf16/fp16.
+type Precision struct {
+	TF32Matmul             *bool               `json:"tf32_matmul,omitempty"`
+	TF32Cudnn              *bool               `json:"tf32_cudnn,omitempty"`
+	Float32MatmulPrecision string              `json:"float32_matmul_precision,omitempty"`
+	Autocast               []string            `json:"autocast,omitempty"`
+	FP8                    *FP8                `json:"fp8,omitempty"`
+	FSDPMixedPrecision     *FSDPMixedPrecision `json:"fsdp_mixed_precision,omitempty"`
+	DeepSpeed              string              `json:"deepspeed,omitempty"`
+}
+
+// FP8 is the FP8 training backend ("transformer_engine", "torchao",
+// "msamp"; empty when accelerate reported fp8 without naming one) and, for
+// Transformer Engine, its recipe class.
+type FP8 struct {
+	Backend string `json:"backend,omitempty"`
+	Recipe  string `json:"recipe,omitempty"`
+}
+
+// FSDPMixedPrecision is an FSDP policy's dtypes: BufferDtype is FSDP1's
+// MixedPrecision, OutputDtype FSDP2's MixedPrecisionPolicy.
+type FSDPMixedPrecision struct {
+	Policy      string `json:"policy,omitempty"`
+	ParamDtype  string `json:"param_dtype,omitempty"`
+	ReduceDtype string `json:"reduce_dtype,omitempty"`
+	BufferDtype string `json:"buffer_dtype,omitempty"`
+	OutputDtype string `json:"output_dtype,omitempty"`
 }
 
 // LRScheduler comes from TrainingArguments or the training CLI. WarmupSteps

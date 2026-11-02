@@ -110,3 +110,36 @@ func TestDescribePrintsTrainingExtras(t *testing.T) {
 		}
 	}
 }
+
+func TestTrainingExtrasPrecision(t *testing.T) {
+	got := trainingExtras(decodeTraining(t, `{
+	  "mixed_precision": "bf16",
+	  "mixed_precision_declared_via": "accelerator",
+	  "precision": {
+	    "tf32_matmul": true, "tf32_cudnn": false, "float32_matmul_precision": "high",
+	    "autocast": ["cuda:bfloat16", "cpu:bfloat16"],
+	    "fp8": {"backend": "transformer_engine", "recipe": "DelayedScaling"},
+	    "fsdp_mixed_precision": {"policy": "MixedPrecision", "param_dtype": "bfloat16", "reduce_dtype": "float32", "buffer_dtype": "bfloat16"},
+	    "deepspeed": "no"
+	  }
+	}`))
+	want := [][2]string{
+		{"Mixed Precision", "bf16 (via: accelerator)"},
+		{"TF32", "matmul true, cudnn false, float32 matmul precision high"},
+		{"Autocast", "cuda:bfloat16, cpu:bfloat16"},
+		{"FP8", "transformer_engine (recipe DelayedScaling)"},
+		{"FSDP Precision", "MixedPrecision: param bfloat16, reduce float32, buffer bfloat16"},
+		{"DeepSpeed Precision", "no"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}
+
+func TestTrainingExtrasFP8WithoutBackend(t *testing.T) {
+	got := trainingExtras(decodeTraining(t, `{"precision": {"fp8": {"backend": null}}}`))
+	want := [][2]string{{"FP8", "unknown backend"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}

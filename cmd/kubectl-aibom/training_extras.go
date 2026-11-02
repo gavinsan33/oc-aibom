@@ -10,9 +10,9 @@ import (
 )
 
 // trainingExtras returns the optional Training lines (label, value) for
-// `describe`: optimizer settings, LR scheduler, mixed precision and
-// determinism. Anything absent is skipped, so an older AIBOM prints nothing
-// extra.
+// `describe`: optimizer settings, LR scheduler, mixed and numerical
+// precision, and determinism. Anything absent is skipped, so an older AIBOM
+// prints nothing extra.
 func trainingExtras(t aibom.Training) [][2]string {
 	var out [][2]string
 	add := func(label, v string) {
@@ -59,7 +59,47 @@ func trainingExtras(t aibom.Training) [][2]string {
 		}
 		add("LR Scheduler", withVia(strings.Join(parts, ", "), s.DeclaredVia))
 	}
-	add("Mixed Precision", t.MixedPrecision)
+	add("Mixed Precision", withVia(t.MixedPrecision, t.MixedPrecisionDeclaredVia))
+	if p := t.Precision; p != nil {
+		tf32 := []string{}
+		if p.TF32Matmul != nil {
+			tf32 = append(tf32, fmt.Sprintf("matmul %v", *p.TF32Matmul))
+		}
+		if p.TF32Cudnn != nil {
+			tf32 = append(tf32, fmt.Sprintf("cudnn %v", *p.TF32Cudnn))
+		}
+		if p.Float32MatmulPrecision != "" {
+			tf32 = append(tf32, "float32 matmul precision "+p.Float32MatmulPrecision)
+		}
+		add("TF32", strings.Join(tf32, ", "))
+		add("Autocast", strings.Join(p.Autocast, ", "))
+		if f := p.FP8; f != nil {
+			fp8 := f.Backend
+			if fp8 == "" {
+				fp8 = "unknown backend"
+			}
+			if f.Recipe != "" {
+				fp8 += " (recipe " + f.Recipe + ")"
+			}
+			add("FP8", fp8)
+		}
+		if f := p.FSDPMixedPrecision; f != nil {
+			dtypes := []string{}
+			for _, d := range [][2]string{{"param", f.ParamDtype}, {"reduce", f.ReduceDtype}, {"buffer", f.BufferDtype}, {"output", f.OutputDtype}} {
+				if d[1] != "" {
+					dtypes = append(dtypes, d[0]+" "+d[1])
+				}
+			}
+			fsdp := strings.Join(dtypes, ", ")
+			if f.Policy != "" && fsdp != "" {
+				fsdp = f.Policy + ": " + fsdp
+			} else if f.Policy != "" {
+				fsdp = f.Policy
+			}
+			add("FSDP Precision", fsdp)
+		}
+		add("DeepSpeed Precision", p.DeepSpeed)
+	}
 
 	if d := t.Determinism; d != nil {
 		add("Seeds", formatSeeds(d.Seeds))
