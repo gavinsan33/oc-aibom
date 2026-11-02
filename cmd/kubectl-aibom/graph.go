@@ -70,10 +70,25 @@ func limitInSeriesUnit(limit float64, displayUnit string) float64 {
 	}
 }
 
+// networkUnit marks a network series: stored in bytes/s like storage, but
+// shown in Mbps, the unit describe/compare (and the console plugin) use for
+// network.
+const networkUnit = "network_bytes_per_sec"
+
+// seriesUnit is the unit to format metric k's series in.
+func seriesUnit(k, unit string) string {
+	if unit == "bytes_per_sec" && strings.HasPrefix(k, "network_") {
+		return networkUnit
+	}
+	return unit
+}
+
 // fmtSeriesValue scales the series' raw base units to the display units
 // describe uses.
 func fmtSeriesValue(unit string, v float64) string {
 	switch unit {
+	case networkUnit:
+		return fmt.Sprintf("%.2f Mbps", v*8/1e6)
 	case "bytes":
 		return fmt.Sprintf("%.2f GiB", v/(1<<30))
 	case "bytes_per_sec":
@@ -221,7 +236,7 @@ func graphRows(runs []graphRun, k string, perSeries bool) (rows []graphRow, unit
 		if !ok || len(m.Aggregate) == 0 {
 			continue
 		}
-		unit = m.Unit
+		unit = seriesUnit(k, m.Unit)
 		if perSeries && !m.SeriesOmitted && len(m.Series) > 1 {
 			for _, sr := range m.Series {
 				if len(sr.Points) == 0 {
@@ -240,7 +255,7 @@ func graphRows(runs []graphRun, k string, perSeries bool) (rows []graphRow, unit
 		row := graphRow{label: r.Name, color: i, pts: m.Aggregate, dur: dur, start: r.Series.Window.Start}
 		if len(m.AggregateMax) > 0 { // bucket peaks survive downsampling; the avg line can hide spikes
 			_, _, pk := seriesStats(m.AggregateMax)
-			row.peak = fmt.Sprintf("  peak %s", fmtSeriesValue(m.Unit, pk))
+			row.peak = fmt.Sprintf("  peak %s", fmtSeriesValue(unit, pk))
 		}
 		rows = append(rows, row)
 		if limit == 0 {

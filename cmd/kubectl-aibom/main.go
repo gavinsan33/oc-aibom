@@ -482,6 +482,35 @@ func formatPodStatus(status string, exitCode *int) string {
 	return statusCell(status, exitCode).rendered
 }
 
+// unitLabels shortens the stat units the webhook writes into spec.data, the
+// same names the console plugin shows.
+var unitLabels = map[string]string{
+	"percent":        "%",
+	"watts":          "W",
+	"seconds":        "s",
+	"tokens_per_sec": "tok/s",
+	"MBps":           "MB/s",
+}
+
+func unitLabel(unit string) string {
+	if l, ok := unitLabels[unit]; ok {
+		return l
+	}
+	return unit
+}
+
+// withUnit appends a stat's unit to a formatted value: "12.00%", "113.62 W".
+func withUnit(value, unit string) string {
+	switch l := unitLabel(unit); l {
+	case "":
+		return value
+	case "%":
+		return value + l
+	default:
+		return value + " " + l
+	}
+}
+
 func formatMetric(v float64) string {
 	return fmt.Sprintf("%.2f", v)
 }
@@ -754,7 +783,7 @@ func printMetricDetail(w io.Writer, metrics map[string]aibom.MetricStats, order 
 			maxCell(m.Max, m.Limit),
 			limitCell(m.Limit),
 			plainCell(formatMetric(m.P95)),
-			plainCell(m.Unit),
+			plainCell(unitLabel(m.Unit)),
 			plainCell(segmentsText),
 		})
 	}
@@ -778,7 +807,7 @@ func printMetricsSection(w io.Writer, title string, metrics map[string]aibom.Met
 			if !ok {
 				continue
 			}
-			fmt.Fprintf(w, "  %-16s %.2f %s\n", labels[key]+":", m.Avg, m.Unit)
+			fmt.Fprintf(w, "  %-16s %s\n", labels[key]+":", withUnit(formatMetric(m.Avg), m.Unit))
 		}
 	}
 	if includesColdStart {
@@ -881,7 +910,7 @@ func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
 			for i := range items {
 				text := "-"
 				if mr.Available[i] {
-					text = strings.TrimSpace(fmt.Sprintf("%s %s", formatMetric(mr.Values[i]), mr.Unit))
+					text = withUnit(formatMetric(mr.Values[i]), mr.Unit)
 				}
 				cells = append(cells, runCell(i, text))
 			}

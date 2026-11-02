@@ -204,3 +204,12 @@ func TestGraphModelQuitBacksOutOfZoom(t *testing.T) {
 		t.Fatal("ctrl+c should quit even when zoomed")
 	}
 }
+
+func TestGraphShowsNetworkInMbps(t *testing.T) {
+	if got := fmtSeriesValue(seriesUnit("network_receive", "bytes_per_sec"), 1.25e6); got != "10.00 Mbps" {
+		t.Fatalf("network = %q, want 10.00 Mbps", got)
+	}
+	if got := fmtSeriesValue(seriesUnit("storage_write_throughput", "bytes_per_sec"), 3e6); got != "3.00 MB/s" {
+		t.Fatalf("storage = %q, want 3.00 MB/s", got)
+	}
+}

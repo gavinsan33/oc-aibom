@@ -63,3 +63,19 @@ func TestDescribeKeepsZeroSettings(t *testing.T) {
 		t.Fatalf("zero vs unset not distinguished:\n%s", out)
 	}
 }
+
+func TestWithUnitUsesShortNames(t *testing.T) {
+	for _, c := range []struct{ value, unit, want string }{
+		{"12.00", "percent", "12.00%"},
+		{"113.62", "watts", "113.62 W"},
+		{"0.24", "seconds", "0.24 s"},
+		{"172.06", "tokens_per_sec", "172.06 tok/s"},
+		{"7.14", "MBps", "7.14 MB/s"},
+		{"7.95", "Mbps", "7.95 Mbps"},
+		{"3", "", "3"},
+	} {
+		if got := withUnit(c.value, c.unit); got != c.want {
+			t.Errorf("withUnit(%q, %q) = %q, want %q", c.value, c.unit, got, c.want)
+		}
+	}
+}
