@@ -125,6 +125,20 @@ func TestComparePerformanceUnavailableOnNote(t *testing.T) {
 	}
 }
 
+func TestComparePerformanceUnavailableWhenMetricMissing(t *testing.T) {
+	// No note, but the run never recorded this metric: its 0 is a placeholder,
+	// so it must not be shown as a reading or get a -100% delta.
+	a := AIBOM{Data: Data{ResourceUtilization: ResourceUtilization{Metrics: map[string]MetricStats{"cpu_usage": {Avg: 2}}}}}
+	b := AIBOM{}
+	r := ComparePerformance([]AIBOM{a, b}, []string{"cpu_usage"})[0]
+	if !r.Available[0] || r.Available[1] {
+		t.Fatalf("availability = %v, want [true false]", r.Available)
+	}
+	if r.Delta != nil || r.PctChange != nil {
+		t.Fatalf("no delta against a missing metric, got %+v", r)
+	}
+}
+
 func TestCompareInferencePerformance(t *testing.T) {
 	// a has vLLM serving metrics; b has no inference block at all.
 	a := AIBOM{Data: Data{Inference: &Inference{Performance: &InferencePerformance{
