@@ -189,14 +189,14 @@ type Dataset struct {
 // detect_trl_from_command falls back to the raw CLI string on a failed
 // int()/float() conversion instead of dropping the field.
 type Training struct {
-	Optimizer               string    `json:"optimizer"`
+	Optimizer string `json:"optimizer"`
 	// Pointers so a JSON null (not recorded) stays distinguishable from 0.
 	LearningRate            *FlexFloat `json:"learning_rate"`
 	BatchSize               *FlexInt   `json:"batch_size"`
 	Epochs                  *FlexInt   `json:"epochs"`
 	RandomSeed              *FlexInt   `json:"random_seed"`
-	ParallelizationStrategy string    `json:"parallelization_strategy"`
-	MixedPrecision          string    `json:"mixed_precision,omitempty"`
+	ParallelizationStrategy string     `json:"parallelization_strategy"`
+	MixedPrecision          string     `json:"mixed_precision,omitempty"`
 	// All nil on AIBOMs from before the webhook recorded them, and whenever
 	// nothing was observed or declared.
 	OptimizerConfig *OptimizerConfig `json:"optimizer_config,omitempty"`
@@ -249,7 +249,7 @@ type Determinism struct {
 }
 
 type FineTuning struct {
-	AdaptationMethod string  `json:"adaptation_method"`
+	AdaptationMethod string   `json:"adaptation_method"`
 	LoRARank         *FlexInt `json:"lora_rank"`
 	LoRAAlpha        *FlexInt `json:"lora_alpha"`
 }
@@ -259,7 +259,7 @@ type FineTuning struct {
 // reason as Training: detect_vllm_from_command falls back to the raw CLI
 // string on a failed conversion.
 type Inference struct {
-	ServingEngine        string    `json:"serving_engine"`
+	ServingEngine string `json:"serving_engine"`
 	// Pointers so a JSON null (the setting wasn't passed) stays distinguishable
 	// from a real 0/false -- describe prints "-" for nil instead of "0".
 	MaxModelLen          *FlexInt   `json:"max_model_len"`
