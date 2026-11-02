@@ -186,6 +186,41 @@ func TestGraphModelToggleLimit(t *testing.T) {
 	}
 }
 
+func TestGraphModelLimitAboveDataIsDrawnAndToggled(t *testing.T) {
+	// A limit above every sample (CPU limit 2 cores, usage peaking well below)
+	// used to fall outside the data-only y range, so no line was drawn and t
+	// appeared to do nothing.
+	lipgloss.SetColorProfile(termenv.ANSI)
+	defer lipgloss.SetColorProfile(termenv.Ascii)
+
+	var s aibom.Series
+	s.Window.Start, s.Window.End = 1000, 1060
+	s.Metrics = map[string]aibom.SeriesMetric{
+		"cpu_usage": {Unit: "cores", Aggregate: [][2]float64{{1000, 0.2}, {1060, 0.6}}},
+	}
+	runs := []graphRun{{Name: "r", Series: s, Limits: map[string]float64{"cpu_usage": 2}}}
+	keys, _ := graphMetricKeys(runs, nil)
+	var m tea.Model = newGraphModel(runs, keys, false)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
+	box := func() string {
+		v := m.View()
+		return v[strings.Index(v, "╭"):strings.Index(v, "╯")]
+	}
+	if !strings.Contains(box(), "\x1b[31m") {
+		t.Fatal("limit above the data should still be drawn")
+	}
+	if !strings.Contains(box(), "2.") {
+		t.Fatal("y axis should reach the limit")
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	if strings.Contains(box(), "\x1b[31m") {
+		t.Fatal("t should hide the limit line")
+	}
+	if strings.Contains(box(), "2.") {
+		t.Fatal("hiding the limit should rescale the y axis to the data")
+	}
+}
+
 func TestGraphModelQuitBacksOutOfZoom(t *testing.T) {
 	runs := tuiRuns()
 	keys, _ := graphMetricKeys(runs, nil)
