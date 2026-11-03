@@ -71,7 +71,8 @@ func TestCompareFieldsTrainingAndSoftware(t *testing.T) {
 		"LR Scheduler":       {"cosine", "linear", ""},
 		"Python Version":     {"3.12.3", "3.12.3", ""},
 		"Torch CUDA Version": {"12.8", "12.8", ""},
-		"Libraries":          {"torch 2.9.0, trl 0.24.0", "torch 2.9.0, trl 0.25.0", ""},
+		// Only the differing library; the run with none recorded stays empty.
+		"Libraries": {"trl 0.24.0 (+1 identical)", "trl 0.25.0 (+1 identical)", ""},
 	} {
 		r, ok := findField(rows, label)
 		if !ok || !reflect.DeepEqual(r.Values, want) {
@@ -235,5 +236,29 @@ func TestCompareFieldsParallelismAndPrecision(t *testing.T) {
 	}
 	if r := CompareFields([]AIBOM{fsdp, fsdp}); r[0].Differs {
 		t.Error("identical runs differ")
+	}
+}
+
+func TestCompareFieldsLibraries(t *testing.T) {
+	run := func(libs map[string]string) AIBOM {
+		return AIBOM{Data: Data{Environment: Environment{Libraries: libs}}}
+	}
+	same := map[string]string{"torch": "2.11.0", "trl": "1.17.1"}
+	r, _ := findField(CompareFields([]AIBOM{run(same), run(same)}), "Libraries")
+	if r.Differs || r.Values[0] != "torch 2.11.0, trl 1.17.1" {
+		t.Errorf("identical libraries: %+v", r)
+	}
+	r, _ = findField(CompareFields([]AIBOM{
+		run(same),
+		run(map[string]string{"torch": "2.11.0", "trl": "1.17.1", "deepspeed": "0.19.9", "peft": "0.21.2"}),
+		run(map[string]string{"torch": "2.11.0", "trl": "1.17.1", "peft": "0.20.0"}),
+	}), "Libraries")
+	want := []string{
+		"deepspeed —, peft — (+2 identical)",
+		"deepspeed 0.19.9, peft 0.21.2 (+2 identical)",
+		"deepspeed —, peft 0.20.0 (+2 identical)",
+	}
+	if !r.Differs || !reflect.DeepEqual(r.Values, want) {
+		t.Errorf("got %q, want %q", r.Values, want)
 	}
 }

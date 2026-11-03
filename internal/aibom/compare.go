@@ -1,6 +1,10 @@
 package aibom
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 // FieldRow is one metadata field compared across N AIBOMs, in the fixed order
 // of compareFieldAccessors. Differs is set when the AIBOMs don't all share the
@@ -92,9 +96,68 @@ func CompareFields(items []AIBOM) []FieldRow {
 				differs = true
 			}
 		}
+		if fa.label == "Libraries" && differs {
+			vals = libraryDifferences(items)
+		}
 		rows = append(rows, FieldRow{Label: fa.label, Values: vals, Differs: differs})
 	}
 	return rows
+}
+
+// libraryDifferences narrows each run's Libraries value to the libraries
+// whose version isn't the same in every run ("—" where a run didn't import
+// it), plus how many others match, so a one-library change isn't a whole
+// differing list. Runs that recorded no libraries stay empty and don't count.
+func libraryDifferences(items []AIBOM) []string {
+	recorded := []map[string]string{}
+	for _, a := range items {
+		if len(a.Data.Environment.Libraries) > 0 {
+			recorded = append(recorded, a.Data.Environment.Libraries)
+		}
+	}
+	names := map[string]bool{}
+	for _, libs := range recorded {
+		for n := range libs {
+			names[n] = true
+		}
+	}
+	differing, same := []string{}, 0
+	for n := range names {
+		v, ok := recorded[0][n]
+		alike := true
+		for _, libs := range recorded[1:] {
+			if w, has := libs[n]; has != ok || w != v {
+				alike = false
+				break
+			}
+		}
+		if alike {
+			same++
+		} else {
+			differing = append(differing, n)
+		}
+	}
+	sort.Strings(differing)
+	vals := make([]string, len(items))
+	for i, a := range items {
+		libs := a.Data.Environment.Libraries
+		if len(libs) == 0 {
+			continue
+		}
+		parts := make([]string, len(differing))
+		for j, n := range differing {
+			v, ok := libs[n]
+			if !ok {
+				v = "—"
+			}
+			parts[j] = n + " " + v
+		}
+		vals[i] = strings.Join(parts, ", ")
+		if same > 0 {
+			vals[i] += fmt.Sprintf(" (+%d identical)", same)
+		}
+	}
+	return vals
 }
 
 // MetricRow is one resource_utilization metric's average compared across N
