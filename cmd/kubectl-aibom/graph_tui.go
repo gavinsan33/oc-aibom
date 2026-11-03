@@ -133,9 +133,10 @@ var brailleBit = [2][4]rune{{0x01, 0x02, 0x04, 0x40}, {0x08, 0x10, 0x20, 0x80}}
 // row's dots are merged into one cell grid (a library that redraws per
 // dataset would wipe earlier runs). A terminal cell has one color, so where
 // runs share one: dots that coincide draw in overlapColor, otherwise the run
-// with the most dots in the cell wins. When limit > 0, a red horizontal line
-// marks the limit value.
-func renderChart(rows []graphRow, lo, hi float64, unit string, limit float64, sharedMax int64, w, h int) string {
+// with the most dots in the cell wins. Each limit is a red horizontal line;
+// one that isn't shared by every run starts with a ■ per run in its color,
+// like the console's swatches.
+func renderChart(rows []graphRow, lo, hi float64, unit string, limits []graphLimit, sharedMax int64, w, h int) string {
 	labels := [3]string{fmtSeriesValue(unit, hi), fmtSeriesValue(unit, (lo+hi)/2), fmtSeriesValue(unit, lo)}
 	labelW := 0
 	for _, l := range labels {
@@ -191,13 +192,21 @@ func renderChart(rows []graphRow, lo, hi float64, unit string, limit float64, sh
 		}
 	}
 
-	// Draw horizontal limit line in red when present
-	if limit > 0 && limit >= lo && limit <= hi {
+	swatch := map[int]int{} // cell -> run color index of a limit's swatch
+	for _, l := range limits {
+		if l.value <= 0 || l.value < lo || l.value > hi {
+			continue
+		}
 		limitColor := -1 // sentinel for limit line
-		y := int((1 - (limit-lo)/(hi-lo)) * float64(dh-1))
+		y := int((1 - (l.value-lo)/(hi-lo)) * float64(dh-1))
 		y = max(0, min(dh-1, y))
 		for x := 0; x < dw; x++ {
 			set(x, y, limitColor)
+		}
+		for j, ci := range l.runs {
+			if j < pw {
+				swatch[(y/4)*pw+j] = ci
+			}
 		}
 	}
 
@@ -252,7 +261,9 @@ func renderChart(rows []graphRow, lo, hi float64, unit string, limit float64, sh
 		}
 		b.WriteString(axis.Render(fmt.Sprintf("%*s│", labelW, lbl)))
 		for col := 0; col < pw; col++ {
-			if c, m := cell(row*pw + col); m != 0 {
+			if ci, ok := swatch[row*pw+col]; ok {
+				b.WriteString(lipgloss.NewStyle().Foreground(tuiColors[ci%len(tuiColors)]).Render("■"))
+			} else if c, m := cell(row*pw + col); m != 0 {
 				b.WriteString(lipgloss.NewStyle().Foreground(c).Render(string(0x2800 + m)))
 			} else {
 				b.WriteByte(' ')
@@ -286,24 +297,40 @@ func abs(n int) int {
 }
 
 func (m graphModel) panel(k string, selected bool, w, h int) string {
-	all, unit, limit := graphRows(m.runs, k, m.pods)
+	all, unit, limits := graphRows(m.runs, k, m.pods)
 	if m.hideLimit {
-		limit = 0
+		limits = nil
 	}
 	lo, hi := graphRange(all)
-	// Reach the limit too, or a limit above every sample (the usual case: a CPU
+	// Reach the limits too, or a limit above every sample (the usual case: a CPU
 	// or memory limit well over usage) is out of range and never drawn. Hiding
-	// it with t drops this, so the chart rescales to the data -- as the console's
-	// "Show limits" switch does.
-	if limit > 0 {
-		hi = max(hi, limit*1.05)
+	// them with t drops this, so the chart rescales to the data -- as the
+	// console's "Show limits" switch does.
+	var shown []graphLimit
+	for _, l := range limits {
+		hi = max(hi, l.value*1.05)
+		// A limit whose runs are all hidden with 1-9 goes too; the rest only
+		// list their visible runs.
+		if l.runs == nil {
+			shown = append(shown, l)
+			continue
+		}
+		var vis []int
+		for _, i := range l.runs {
+			if !m.hidden[i] {
+				vis = append(vis, i)
+			}
+		}
+		if len(vis) > 0 {
+			shown = append(shown, graphLimit{value: l.value, runs: vis})
+		}
 	}
 	border := lipgloss.Color("8")
 	if selected {
 		border = lipgloss.Color("6")
 	}
 	title := lipgloss.NewStyle().Bold(true).Render(graphMetricLabel(k))
-	body := title + "\n" + renderChart(m.visible(all), lo, hi, unit, limit, m.sharedMax, max(10, w-2), max(4, h-3))
+	body := title + "\n" + renderChart(m.visible(all), lo, hi, unit, shown, m.sharedMax, max(10, w-2), max(4, h-3))
 	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).
 		Width(w - 2).Height(h - 2).Render(body)
 }
@@ -311,7 +338,8 @@ func (m graphModel) panel(k string, selected bool, w, h int) string {
 // statsLines is the selected metric's min/avg/max per row, capped so a
 // --pods run with many GPUs can't push the charts off screen.
 func (m graphModel) statsLines() []string {
-	all, unit, _ := graphRows(m.runs, m.metrics[m.sel], m.pods)
+	all, unit, limits := graphRows(m.runs, m.metrics[m.sel], m.pods)
+	_, runLimit := limitNotes(limits, unit)
 	rows := m.visible(all)
 	const maxLines = 5
 	var out []string
@@ -321,9 +349,9 @@ func (m graphModel) statsLines() []string {
 			break
 		}
 		rmin, ravg, rmax := seriesStats(r.pts)
-		out = append(out, fmt.Sprintf(" %s  min %s  avg %s  max %s%s",
+		out = append(out, fmt.Sprintf(" %s  min %s  avg %s  max %s%s%s",
 			lipgloss.NewStyle().Foreground(tuiColors[r.color%len(tuiColors)]).Render("■ "+r.label),
-			fmtSeriesValue(unit, rmin), fmtSeriesValue(unit, ravg), fmtSeriesValue(unit, rmax), r.peak))
+			fmtSeriesValue(unit, rmin), fmtSeriesValue(unit, ravg), fmtSeriesValue(unit, rmax), r.peak, runLimit[r.color]))
 	}
 	return out
 }

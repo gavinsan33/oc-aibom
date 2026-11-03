@@ -226,16 +226,60 @@ func sharedElapsed(runs []graphRun) int64 {
 	return m
 }
 
+// graphLimit is one limit line: the runs (by index, which is also their
+// color) whose limit it is, or nil runs when every charted run shares it.
+// Value 0 groups the charted runs that have no limit.
+type graphLimit struct {
+	value float64
+	runs  []int
+}
+
+// groupLimits is one limit per distinct value among the charted runs, highest
+// first, as the console plugin's groupLimits. Only when every charted run has
+// the same limit is it a single shared limit; otherwise each names its runs,
+// so one run's limit doesn't read as everyone's, and runs without one are
+// grouped last under value 0.
+func groupLimits(runs []graphRun, k string, charted []int) []graphLimit {
+	var out []graphLimit
+	var none []int
+	for _, i := range charted {
+		v := runs[i].Limits[k]
+		if v <= 0 {
+			none = append(none, i)
+			continue
+		}
+		j := 0
+		for j < len(out) && out[j].value > v {
+			j++
+		}
+		if j < len(out) && out[j].value == v {
+			out[j].runs = append(out[j].runs, i)
+			continue
+		}
+		out = append(out[:j], append([]graphLimit{{value: v, runs: []int{i}}}, out[j:]...)...)
+	}
+	if len(out) == 1 && len(none) == 0 {
+		out[0].runs = nil
+	}
+	if len(out) > 0 && len(none) > 0 {
+		out = append(out, graphLimit{runs: none})
+	}
+	return out
+}
+
 // graphRows is the lines to draw for one metric: one aggregate row per run
 // that has it, or with perSeries (and more than one, undropped series) that
-// run's pod/GPU/container rows instead. Returns the first available limit.
-func graphRows(runs []graphRun, k string, perSeries bool) (rows []graphRow, unit string, limit float64) {
+// run's pod/GPU/container rows instead, plus those runs' limits (groupLimits).
+func graphRows(runs []graphRun, k string, perSeries bool) (rows []graphRow, unit string, limits []graphLimit) {
+	var charted []int
+	defer func() { limits = groupLimits(runs, k, charted) }()
 	for i, r := range runs {
 		dur := r.Series.Window.End - r.Series.Window.Start
 		m, ok := r.Series.Metrics[k]
 		if !ok || len(m.Aggregate) == 0 {
 			continue
 		}
+		charted = append(charted, i)
 		unit = seriesUnit(k, m.Unit)
 		if perSeries && !m.SeriesOmitted && len(m.Series) > 1 {
 			for _, sr := range m.Series {
@@ -258,11 +302,31 @@ func graphRows(runs []graphRun, k string, perSeries bool) (rows []graphRow, unit
 			row.peak = fmt.Sprintf("  peak %s", fmtSeriesValue(unit, pk))
 		}
 		rows = append(rows, row)
-		if limit == 0 {
-			limit = r.Limits[k]
+	}
+	return rows, unit, nil
+}
+
+// limitNotes places a metric's limits in the text graph: "(limit: 2 cores)"
+// in the header when every run shares it; otherwise each run's own limit on
+// its stats line (run names are too long to list in the header).
+func limitNotes(limits []graphLimit, unit string) (header string, perRun map[int]string) {
+	if len(limits) == 0 {
+		return "", nil
+	}
+	if limits[0].runs == nil {
+		return fmt.Sprintf(" (limit: %s)", fmtSeriesValue(unit, limits[0].value)), nil
+	}
+	perRun = map[int]string{}
+	for _, l := range limits {
+		note := "  no limit"
+		if l.value > 0 {
+			note = "  limit " + fmtSeriesValue(unit, l.value)
+		}
+		for _, i := range l.runs {
+			perRun[i] = note
 		}
 	}
-	return rows, unit, limit
+	return " (limits differ per run)", perRun
 }
 
 // printGraph draws one block per metric with a row per run, mirroring the
@@ -281,7 +345,7 @@ func printGraph(w io.Writer, runs []graphRun, only []string, perSeries bool, wid
 	fmt.Fprintf(w, "Elapsed time since each run's start; the axis spans 0 → %s (longest run).\n\n", time.Duration(sharedMax)*time.Second)
 
 	for _, k := range order {
-		rows, unit, limit := graphRows(runs, k, perSeries)
+		rows, unit, limits := graphRows(runs, k, perSeries)
 		if len(rows) == 0 {
 			continue
 		}
@@ -292,19 +356,15 @@ func printGraph(w io.Writer, runs []graphRun, only []string, perSeries bool, wid
 			lo, hi = min(lo, rmin), max(hi, rmax)
 			labelW = max(labelW, utf8.RuneCountInString(row.label))
 		}
-		label := graphMetricLabel(k)
-		limitSuffix := ""
-		if limit > 0 {
-			limitSuffix = fmt.Sprintf(" (limit: %s)", fmtSeriesValue(unit, limit))
-		}
-		fmt.Fprintln(w, cyan(label+limitSuffix))
+		limitHeader, runLimit := limitNotes(limits, unit)
+		fmt.Fprintln(w, cyan(graphMetricLabel(k)+limitHeader))
 		avail := max(10, width-labelW-2)
 		for _, row := range rows {
 			cells := max(1, min(avail, int(float64(avail)*float64(row.dur)/float64(sharedMax)+0.5)))
 			pad := strings.Repeat(" ", labelW-utf8.RuneCountInString(row.label))
 			rmin, ravg, rmax := seriesStats(row.pts)
 			fmt.Fprintf(w, "  %s%s %s\n", colorize(runColor(row.color), row.label), pad, colorize(runColor(row.color), sparkline(row.pts, cells, lo, hi)))
-			fmt.Fprintf(w, "  %s min %s  avg %s  max %s%s\n", strings.Repeat(" ", labelW), fmtSeriesValue(unit, rmin), fmtSeriesValue(unit, ravg), fmtSeriesValue(unit, rmax), row.peak)
+			fmt.Fprintf(w, "  %s min %s  avg %s  max %s%s%s\n", strings.Repeat(" ", labelW), fmtSeriesValue(unit, rmin), fmtSeriesValue(unit, ravg), fmtSeriesValue(unit, rmax), row.peak, runLimit[row.color])
 		}
 		fmt.Fprintln(w)
 	}

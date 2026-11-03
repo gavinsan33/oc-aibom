@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 	"math"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -246,5 +248,69 @@ func TestGraphShowsNetworkInMbps(t *testing.T) {
 	}
 	if got := fmtSeriesValue(seriesUnit("storage_write_throughput", "bytes_per_sec"), 3e6); got != "3.00 MB/s" {
 		t.Fatalf("storage = %q, want 3.00 MB/s", got)
+	}
+}
+
+func limitRuns(limits ...float64) []graphRun {
+	var s aibom.Series
+	s.Window.Start, s.Window.End = 1000, 1060
+	s.Metrics = map[string]aibom.SeriesMetric{
+		"cpu_usage": {Unit: "cores", Aggregate: [][2]float64{{1000, 0.2}, {1060, 0.6}}},
+	}
+	var runs []graphRun
+	for i, l := range limits {
+		runs = append(runs, graphRun{Name: fmt.Sprintf("run%d", i), Series: s, Limits: map[string]float64{"cpu_usage": l}})
+	}
+	return runs
+}
+
+func TestGroupLimits(t *testing.T) {
+	if got := groupLimits(limitRuns(2, 2), "cpu_usage", []int{0, 1}); !reflect.DeepEqual(got, []graphLimit{{value: 2}}) {
+		t.Fatalf("shared limit: %+v", got)
+	}
+	got := groupLimits(limitRuns(2, 4, 2, 0), "cpu_usage", []int{0, 1, 2, 3})
+	want := []graphLimit{{value: 4, runs: []int{1}}, {value: 2, runs: []int{0, 2}}, {runs: []int{3}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	if got := groupLimits(limitRuns(0, 0), "cpu_usage", []int{0, 1}); got != nil {
+		t.Fatalf("no limits: %+v", got)
+	}
+}
+
+func TestPrintGraphNamesDifferingLimits(t *testing.T) {
+	var buf bytes.Buffer
+	if err := printGraph(&buf, limitRuns(2, 4, 0), nil, false, 40); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"CPU Usage (limits differ per run)", "max 0.60 cores  limit 2.00 cores", "max 0.60 cores  limit 4.00 cores", "max 0.60 cores  no limit"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q: %s", want, out)
+		}
+	}
+}
+
+func TestGraphModelDifferingLimitsGetRunSwatches(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.ANSI)
+	defer lipgloss.SetColorProfile(termenv.Ascii)
+	runs := limitRuns(2, 4)
+	keys, _ := graphMetricKeys(runs, nil)
+	var m tea.Model = newGraphModel(runs, keys, false)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
+	box := func() string {
+		v := m.View()
+		return v[strings.Index(v, "╭"):strings.Index(v, "╯")]
+	}
+	blue, magenta := "\x1b[34m■", "\x1b[35m■"
+	if !strings.Contains(box(), blue) || !strings.Contains(box(), magenta) {
+		t.Fatal("each run's limit should carry its color swatch")
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	if strings.Contains(box(), magenta) || !strings.Contains(box(), blue) {
+		t.Fatal("hiding a run should drop its limit's swatch")
+	}
+	if !strings.Contains(box(), "4.") {
+		t.Fatal("hiding a run shouldn't rescale the chart")
 	}
 }
