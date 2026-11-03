@@ -200,6 +200,7 @@ func (m listModel) updateSort(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sortBy = sortOptions[m.sortCursor]
 		(&m).refresh()
 		m.mode = modeList
+		saveListPrefs(listPrefs{SortBy: m.sortBy, Ascending: m.ascending})
 	}
 	return m, nil
 }
@@ -709,9 +710,18 @@ func stripeBG() string {
 	return "\x1b[48;5;254m" // off-white
 }
 
-func runListTUI(items []aibom.AIBOM, client dynamic.Interface, allNS bool, sortBy string, ascending bool) error {
+// runListTUI opens the interactive list. With useSaved (no --sort-by or
+// --ascending given) the sort last applied from the menu is restored.
+func runListTUI(items []aibom.AIBOM, client dynamic.Interface, allNS bool, sortBy string, ascending, useSaved bool) error {
 	if sortBy == "" {
 		sortBy = "age"
+	}
+	saved, restore := listPrefs{}, false
+	if useSaved {
+		saved, restore = loadListPrefs()
+	}
+	if restore {
+		sortBy, ascending = saved.SortBy, saved.Ascending
 	}
 	m := listModel{
 		all:       items,
@@ -722,6 +732,9 @@ func runListTUI(items []aibom.AIBOM, client dynamic.Interface, allNS bool, sortB
 		ascending: ascending,
 		selected:  map[int]bool{},
 		stripeBG:  stripeBG(), // resolved once; HasDarkBackground queries the terminal
+	}
+	if restore {
+		(&m).refresh() // items arrive sorted by the flags
 	}
 	_, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
 	return err

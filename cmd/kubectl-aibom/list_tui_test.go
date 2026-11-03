@@ -52,6 +52,7 @@ func TestListSelectOrder(t *testing.T) {
 }
 
 func TestSortMenuAppliesAndResets(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	m := testModel()
 	m.sortBy = "age"
 	m.cursor = 2
@@ -76,6 +77,20 @@ func TestSortMenuAppliesAndResets(t *testing.T) {
 	}
 	if m.cursor != 0 || len(m.selected) != 0 {
 		t.Fatalf("apply should reset cursor/selection, got cursor=%d selected=%v", m.cursor, m.selected)
+	}
+	if p, ok := loadListPrefs(); !ok || p != (listPrefs{SortBy: "gpu-utilization", Ascending: true}) {
+		t.Fatalf("applied sort should be saved, got %+v ok=%v", p, ok)
+	}
+}
+
+func TestListPrefsIgnoreMissingOrUnknownSort(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if _, ok := loadListPrefs(); ok {
+		t.Fatal("no saved prefs should report none")
+	}
+	saveListPrefs(listPrefs{SortBy: "not-a-metric"})
+	if _, ok := loadListPrefs(); ok {
+		t.Fatal("a sort the menu no longer offers should be ignored")
 	}
 }
 

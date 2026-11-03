@@ -74,7 +74,8 @@ func main() {
 			printList(items, rootOpts.allNamespaces, rootOpts.sortBy)
 			return nil
 		}
-		return runListTUI(items, client, rootOpts.allNamespaces, rootOpts.sortBy, rootOpts.ascending)
+		useSaved := !cmd.Flags().Changed("sort-by") && !cmd.Flags().Changed("ascending")
+		return runListTUI(items, client, rootOpts.allNamespaces, rootOpts.sortBy, rootOpts.ascending, useSaved)
 	}
 	rootOpts.register(root)
 
