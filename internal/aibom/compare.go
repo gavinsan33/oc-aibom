@@ -108,6 +108,24 @@ func ComparePerformance(items []AIBOM, keys []string) []MetricRow {
 	})
 }
 
+// RuntimeKey is CompareRuntime's MetricRow key.
+const RuntimeKey = "runtime"
+
+// CompareRuntime is a MetricRow of each run's wall-clock duration in seconds
+// (execution_metadata.duration_seconds), which leads the Hardware Performance
+// table so how long each run took sits next to what it used -- as the console
+// plugin's Runtime row. Unavailable only when the duration wasn't recorded; a
+// resource_utilization note doesn't blank it.
+func CompareRuntime(items []AIBOM) MetricRow {
+	return comparePerformance(items, []string{RuntimeKey}, func(a AIBOM, _ string) (float64, bool, string) {
+		d := a.Data.ExecutionMetadata.DurationSeconds
+		if d == nil {
+			return 0, false, "s"
+		}
+		return *d, true, "s"
+	})[0]
+}
+
 // CompareInferencePerformance is ComparePerformance over inference.performance
 // (serving-engine) metrics instead of hardware ones. Availability is per
 // metric, not per run: engines export different subsets (TGI has no TTFT,
