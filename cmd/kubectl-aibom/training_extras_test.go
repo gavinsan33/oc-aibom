@@ -143,3 +143,33 @@ func TestTrainingExtrasFP8WithoutBackend(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestTrainingExtrasDistributed(t *testing.T) {
+	got := trainingExtras(decodeTraining(t, `{"distributed": {
+	  "world_size": 8, "nodes": 2, "processes_per_node": 4, "world_declared_via": "environment",
+	  "tensor_parallel_size": 2, "data_parallel_size": 4, "parallel_sizes_declared_via": "device_mesh",
+	  "device_mesh": {"dp_shard": 4, "tp": 2},
+	  "fsdp": {"version": 2, "reshard_after_forward": true, "cpu_offload": false, "declared_via": "fsdp_module"},
+	  "deepspeed": {"zero_stage": 3, "offload_optimizer": "cpu", "declared_via": "deepspeed_engine"},
+	  "strategies": ["fsdp", "tensor_parallel"]
+	}}`))
+	want := [][2]string{
+		{"Parallelism", "fsdp + tensor_parallel"},
+		{"Topology", "8 processes, 2 nodes, 4 per node (via: environment)"},
+		{"Parallel Sizes", "tensor 2, data 4 (via: device_mesh)"},
+		{"Device Mesh", "dp_shard=4, tp=2"},
+		{"FSDP", "FSDP2, reshard after forward true, CPU offload false (via: fsdp_module)"},
+		{"DeepSpeed", "ZeRO-3, optimizer offload cpu (via: deepspeed_engine)"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}
+
+func TestTrainingExtrasDistributedEmptyBlocks(t *testing.T) {
+	got := trainingExtras(decodeTraining(t, `{"distributed": {"fsdp": {"declared_via": "accelerate_config"}, "strategies": ["fsdp"]}}`))
+	want := [][2]string{{"Parallelism", "fsdp"}, {"FSDP", "enabled (via: accelerate_config)"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}
