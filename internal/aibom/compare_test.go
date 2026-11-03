@@ -220,7 +220,6 @@ func TestCompareFieldsParallelismAndPrecision(t *testing.T) {
 	for label, want := range map[string][]string{
 		// Where a value was found doesn't make two runs differ.
 		"Mixed Precision": {"bf16", "bf16", ""},
-		"Parallelization": {"fsdp", "deepspeed", ""},
 		"Parallelism":     {"fsdp", "deepspeed", ""},
 		"Topology":        {"3 processes, 1 node, 3 per node", "2 processes, 1 node, 2 per node", ""},
 		"FSDP":            {"FSDP2, reshard after forward true, CPU offload false", "", ""},
@@ -260,5 +259,16 @@ func TestCompareFieldsLibraries(t *testing.T) {
 	}
 	if !r.Differs || !reflect.DeepEqual(r.Values, want) {
 		t.Errorf("got %q, want %q", r.Values, want)
+	}
+}
+
+func TestParallelismFallsBackToParallelizationStrategy(t *testing.T) {
+	old := Training{ParallelizationStrategy: "data_parallel"}
+	both := Training{ParallelizationStrategy: "fsdp", Distributed: &Distributed{Strategies: []string{"fsdp", "tensor_parallel"}}}
+	if got := old.Parallelism(); got != "data_parallel" {
+		t.Errorf("older AIBOM: %q", got)
+	}
+	if got := both.Parallelism(); got != "fsdp + tensor_parallel" {
+		t.Errorf("with strategies: %q", got)
 	}
 }

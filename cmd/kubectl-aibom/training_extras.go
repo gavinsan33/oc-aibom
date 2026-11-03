@@ -154,7 +154,6 @@ func distributedLines(d aibom.Distributed) [][2]string {
 			out = append(out, [2]string{label, v})
 		}
 	}
-	add("Parallelism", d.Parallelism())
 	add("Topology", withVia(d.Topology(), d.WorldDeclaredVia))
 	add("Parallel Sizes", withVia(d.ParallelSizes(), d.ParallelSizesDeclaredVia))
 	mesh := make(map[string]any, len(d.DeviceMesh))

@@ -56,8 +56,7 @@ var compareFieldAccessors = []fieldAccessor{
 		return a.Data.Training.LRScheduler.Type
 	}},
 	{"Mixed Precision", func(a AIBOM) string { return training(a).MixedPrecision }},
-	{"Parallelization", func(a AIBOM) string { return training(a).ParallelizationStrategy }},
-	{"Parallelism", func(a AIBOM) string { return training(a).Distributed.Parallelism() }},
+	{"Parallelism", func(a AIBOM) string { return training(a).Parallelism() }},
 	{"Topology", func(a AIBOM) string { return training(a).Distributed.Topology() }},
 	{"Parallel Sizes", func(a AIBOM) string { return training(a).Distributed.ParallelSizes() }},
 	{"FSDP", func(a AIBOM) string { return training(a).Distributed.FSDPSummary() }},

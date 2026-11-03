@@ -9,12 +9,14 @@ import (
 // found) and `compare`/`diff` (which don't, so two runs differing only in
 // the source aren't reported as different). All return "" for a nil block.
 
-// Parallelism is the strategies joined, e.g. "fsdp + tensor_parallel".
-func (d *Distributed) Parallelism() string {
-	if d == nil {
-		return ""
+// Parallelism is every kind of parallelism the run used, e.g.
+// "fsdp + tensor_parallel", from distributed.strategies; an AIBOM from
+// before that field falls back to parallelization_strategy.
+func (t Training) Parallelism() string {
+	if t.Distributed != nil && len(t.Distributed.Strategies) > 0 {
+		return strings.Join(t.Distributed.Strategies, " + ")
 	}
-	return strings.Join(d.Strategies, " + ")
+	return t.ParallelizationStrategy
 }
 
 // Topology is e.g. "8 processes, 2 nodes, 4 per node".

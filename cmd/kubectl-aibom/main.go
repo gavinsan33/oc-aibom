@@ -656,7 +656,7 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		fmt.Fprintf(w, "  Batch Size:             %s\n", optional(t.BatchSize))
 		fmt.Fprintf(w, "  Epochs:                 %s\n", optional(t.Epochs))
 		fmt.Fprintf(w, "  Random Seed:            %s\n", optional(t.RandomSeed))
-		fmt.Fprintf(w, "  Parallelization:        %s\n", t.ParallelizationStrategy)
+		fmt.Fprintf(w, "  Parallelism:            %s\n", t.Parallelism())
 		for _, l := range trainingExtras(*t) {
 			fmt.Fprintf(w, "  %-23s %s\n", l[0]+":", l[1])
 		}
