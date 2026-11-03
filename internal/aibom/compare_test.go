@@ -253,9 +253,9 @@ func TestCompareFieldsLibraries(t *testing.T) {
 		run(map[string]string{"torch": "2.11.0", "trl": "1.17.1", "peft": "0.20.0"}),
 	}), "Libraries")
 	want := []string{
-		"deepspeed —, peft — (+2 identical)",
+		"deepspeed not imported, peft not imported (+2 identical)",
 		"deepspeed 0.19.9, peft 0.21.2 (+2 identical)",
-		"deepspeed —, peft 0.20.0 (+2 identical)",
+		"deepspeed not imported, peft 0.20.0 (+2 identical)",
 	}
 	if !r.Differs || !reflect.DeepEqual(r.Values, want) {
 		t.Errorf("got %q, want %q", r.Values, want)
