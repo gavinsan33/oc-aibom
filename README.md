@@ -199,7 +199,7 @@ telemetry tab, x is elapsed time since each run's own start on a shared axis
 | `enter` / `z` | zoom the selected metric full screen (`enter`, `q` or `esc` to go back) |
 | `1`–`9` | hide / show that run (the y scale stays put) |
 | `p` | per-pod / GPU / container lines instead of each run's aggregate |
-| `t` | show / hide the red limit line |
+| `t` | show / hide the red limit lines |
 | `q` / `esc` | quit (when zoomed, go back first; `ctrl+c` always quits) |
 
 When opened from the interactive browser (not as a standalone command), a
@@ -208,6 +208,12 @@ page for the same run(s), and `q`/`esc` backs out to the list instead of quittin
 
 Where runs' lines coincide the cell is drawn white, since a terminal cell
 can only hold one color; hide runs with `1`–`9` to see each one on its own.
+
+Hardware limits draw as red lines. When the compared runs' limits differ, each
+distinct limit gets its own line, starting with a `■` in the color of each run
+it belongs to, and every run's stats line gives its own limit (`--text` prints
+them there too, as `limit 8.00 GiB` or `no limit`). Runs that all share one
+limit get a single line, shown in the metric's header in `--text`.
 
 The footer shows the selected metric's min/avg/max per run (and per-bucket
 peak where recorded). Series that fail the digest check are left out, as are
