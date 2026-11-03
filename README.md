@@ -64,6 +64,10 @@ table; move a cursor through the rows and drill into `describe`, `compare` or
 `graph` without leaving the terminal. (Piped or redirected, it just prints the
 plain table, so `oc aibom | grep …` still works.) Any `list` flags
 (`--sort-by`/`--ascending`/the filters below) seed its initial state.
+The sort you last applied from the `s` menu is remembered (in
+`~/.config/oc-aibom/prefs.json`, or your OS's user config directory) and
+restored the next time it opens, unless `--sort-by` or `--ascending` is given.
+The plain `list` output always follows its flags.
 
 | Key | Action |
 | --- | --- |
