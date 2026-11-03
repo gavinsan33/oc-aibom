@@ -235,8 +235,8 @@ oc aibom graph run1 run2 --text --width 100
 Side-by-side comparison of two or more AIBOMs, mirroring the console plugin's
 compare view: a Fields table (model config, dataset declaration/drift, git
 provenance, hardware/driver environment, AIBOM version — one column per run,
-with differing fields marked `*`) and a Hardware Performance table (one column
-per run, plus delta/percent-change columns when exactly two are compared).
+with differing fields marked `*`) and a Hardware Performance table (runtime, then each
+metric's average; one column per run, plus delta/percent-change columns when exactly two are compared).
 Pass `--changed` to show only the fields that differ.
 
 ### `oc aibom diff <name-a> <name-b>`

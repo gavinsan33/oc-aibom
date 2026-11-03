@@ -178,3 +178,20 @@ func TestCompareInferencePerformancePerMetric(t *testing.T) {
 		t.Fatalf("gen row = %+v, want delta 50 / +50%%", gen)
 	}
 }
+
+func TestCompareRuntime(t *testing.T) {
+	secs := func(s float64) AIBOM {
+		return AIBOM{Data: Data{
+			ExecutionMetadata:   ExecutionMetadata{DurationSeconds: &s},
+			ResourceUtilization: ResourceUtilization{Note: "telemetry unavailable"},
+		}}
+	}
+	r := CompareRuntime([]AIBOM{secs(600), secs(900)})
+	if r.Key != RuntimeKey || r.Values[1] != 900 || !r.Available[1] || r.Delta == nil || *r.Delta != 300 {
+		t.Fatalf("runtime row = %+v, want 600/900 delta 300 despite the note", r)
+	}
+	r = CompareRuntime([]AIBOM{secs(600), {}})
+	if r.Available[1] || r.Delta != nil {
+		t.Fatalf("unrecorded duration should be unavailable with no delta, got %+v", r)
+	}
+}

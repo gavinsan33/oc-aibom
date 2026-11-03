@@ -906,10 +906,17 @@ func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
 		fmt.Fprintln(w, bold(title+":"))
 		rows := runHeader("METRIC", extra...)
 		for _, mr := range metricRows {
-			cells := []cell{labelCell(labels[mr.Key])}
+			runtime := mr.Key == aibom.RuntimeKey
+			label := labels[mr.Key]
+			if runtime {
+				label = "Runtime"
+			}
+			cells := []cell{labelCell(label)}
 			for i := range items {
 				text := "-"
-				if mr.Available[i] {
+				if mr.Available[i] && runtime {
+					text = (time.Duration(mr.Values[i]) * time.Second).String()
+				} else if mr.Available[i] {
 					text = withUnit(formatMetric(mr.Values[i]), mr.Unit)
 				}
 				cells = append(cells, runCell(i, text))
@@ -919,6 +926,12 @@ func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
 				deltaCell, changeCell := plainCell(deltaText), plainCell(changeText)
 				if mr.Delta != nil {
 					deltaText = fmt.Sprintf("%+.2f", *mr.Delta)
+					if runtime { // as a duration, like the runtime cells
+						deltaText = (time.Duration(*mr.Delta) * time.Second).String()
+						if *mr.Delta > 0 {
+							deltaText = "+" + deltaText
+						}
+					}
 					deltaCell = coloredCell(deltaText, colorBySign(*mr.Delta, deltaText))
 				}
 				if mr.PctChange != nil {
@@ -932,7 +945,8 @@ func printCompare(w io.Writer, items []aibom.AIBOM, changedOnly bool) {
 		writeTable(w, rows)
 	}
 
-	perfTable("Hardware Performance", telemetryMetricLabels, aibom.ComparePerformance(items, telemetryMetricOrder))
+	perfTable("Hardware Performance", telemetryMetricLabels,
+		append([]aibom.MetricRow{aibom.CompareRuntime(items)}, aibom.ComparePerformance(items, telemetryMetricOrder)...))
 
 	// Only shown when some run carries inference telemetry; otherwise every row
 	// is "—" and the table is noise for non-serving workloads.
