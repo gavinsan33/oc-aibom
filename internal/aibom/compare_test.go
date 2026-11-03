@@ -71,7 +71,8 @@ func TestCompareFieldsTrainingAndSoftware(t *testing.T) {
 		"LR Scheduler":       {"cosine", "linear", ""},
 		"Python Version":     {"3.12.3", "3.12.3", ""},
 		"Torch CUDA Version": {"12.8", "12.8", ""},
-		"Libraries":          {"torch 2.9.0, trl 0.24.0", "torch 2.9.0, trl 0.25.0", ""},
+		// Only the differing library; the run with none recorded stays empty.
+		"Libraries": {"trl 0.24.0 (+1 identical)", "trl 0.25.0 (+1 identical)", ""},
 	} {
 		r, ok := findField(rows, label)
 		if !ok || !reflect.DeepEqual(r.Values, want) {
@@ -193,5 +194,81 @@ func TestCompareRuntime(t *testing.T) {
 	r = CompareRuntime([]AIBOM{secs(600), {}})
 	if r.Available[1] || r.Delta != nil {
 		t.Fatalf("unrecorded duration should be unavailable with no delta, got %+v", r)
+	}
+}
+
+func TestCompareFieldsParallelismAndPrecision(t *testing.T) {
+	n := func(v int) *int { return &v }
+	yes, no := true, false
+	fsdp := AIBOM{Data: Data{Training: &Training{
+		MixedPrecision: "bf16", MixedPrecisionDeclaredVia: "accelerator", ParallelizationStrategy: "fsdp",
+		Distributed: &Distributed{
+			WorldSize: n(3), Nodes: n(1), ProcessesPerNode: n(3), WorldDeclaredVia: "environment",
+			FSDP:       &DistributedFSDP{Version: n(2), ReshardAfterForward: &yes, CPUOffload: &no, DeclaredVia: "fsdp_module"},
+			Strategies: []string{"fsdp"},
+		},
+	}}}
+	deepspeed := AIBOM{Data: Data{Training: &Training{
+		MixedPrecision: "bf16", MixedPrecisionDeclaredVia: "deepspeed", ParallelizationStrategy: "deepspeed",
+		Distributed: &Distributed{
+			WorldSize: n(2), Nodes: n(1), ProcessesPerNode: n(2), WorldDeclaredVia: "cli_arg",
+			DeepSpeed:  &DistributedDeepSpeed{ZeroStage: n(3), OffloadOptimizer: "cpu", OffloadParam: "none"},
+			Strategies: []string{"deepspeed"},
+		},
+	}}}
+	rows := CompareFields([]AIBOM{fsdp, deepspeed, {}})
+	for label, want := range map[string][]string{
+		// Where a value was found doesn't make two runs differ.
+		"Mixed Precision": {"bf16", "bf16", ""},
+		"Parallelism":     {"fsdp", "deepspeed", ""},
+		"Topology":        {"3 processes, 1 node, 3 per node", "2 processes, 1 node, 2 per node", ""},
+		"FSDP":            {"FSDP2, reshard after forward true, CPU offload false", "", ""},
+		"DeepSpeed":       {"", "ZeRO-3, optimizer offload cpu, param offload none", ""},
+	} {
+		r, ok := findField(rows, label)
+		if !ok || !reflect.DeepEqual(r.Values, want) {
+			t.Errorf("%s row = %+v, want %v", label, r, want)
+		}
+	}
+	if r, _ := findField(rows, "Mixed Precision"); !r.Differs {
+		t.Error("Mixed Precision should differ: the third AIBOM has none")
+	}
+	if r := CompareFields([]AIBOM{fsdp, fsdp}); r[0].Differs {
+		t.Error("identical runs differ")
+	}
+}
+
+func TestCompareFieldsLibraries(t *testing.T) {
+	run := func(libs map[string]string) AIBOM {
+		return AIBOM{Data: Data{Environment: Environment{Libraries: libs}}}
+	}
+	same := map[string]string{"torch": "2.11.0", "trl": "1.17.1"}
+	r, _ := findField(CompareFields([]AIBOM{run(same), run(same)}), "Libraries")
+	if r.Differs || r.Values[0] != "torch 2.11.0, trl 1.17.1" {
+		t.Errorf("identical libraries: %+v", r)
+	}
+	r, _ = findField(CompareFields([]AIBOM{
+		run(same),
+		run(map[string]string{"torch": "2.11.0", "trl": "1.17.1", "deepspeed": "0.19.9", "peft": "0.21.2"}),
+		run(map[string]string{"torch": "2.11.0", "trl": "1.17.1", "peft": "0.20.0"}),
+	}), "Libraries")
+	want := []string{
+		"deepspeed —, peft — (+2 identical)",
+		"deepspeed 0.19.9, peft 0.21.2 (+2 identical)",
+		"deepspeed —, peft 0.20.0 (+2 identical)",
+	}
+	if !r.Differs || !reflect.DeepEqual(r.Values, want) {
+		t.Errorf("got %q, want %q", r.Values, want)
+	}
+}
+
+func TestParallelismFallsBackToParallelizationStrategy(t *testing.T) {
+	old := Training{ParallelizationStrategy: "data_parallel"}
+	both := Training{ParallelizationStrategy: "fsdp", Distributed: &Distributed{Strategies: []string{"fsdp", "tensor_parallel"}}}
+	if got := old.Parallelism(); got != "data_parallel" {
+		t.Errorf("older AIBOM: %q", got)
+	}
+	if got := both.Parallelism(); got != "fsdp + tensor_parallel" {
+		t.Errorf("with strategies: %q", got)
 	}
 }

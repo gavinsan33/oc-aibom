@@ -154,7 +154,6 @@ func TestTrainingExtrasDistributed(t *testing.T) {
 	  "strategies": ["fsdp", "tensor_parallel"]
 	}}`))
 	want := [][2]string{
-		{"Parallelism", "fsdp + tensor_parallel"},
 		{"Topology", "8 processes, 2 nodes, 4 per node (via: environment)"},
 		{"Parallel Sizes", "tensor 2, data 4 (via: device_mesh)"},
 		{"Device Mesh", "dp_shard=4, tp=2"},
@@ -168,7 +167,7 @@ func TestTrainingExtrasDistributed(t *testing.T) {
 
 func TestTrainingExtrasDistributedEmptyBlocks(t *testing.T) {
 	got := trainingExtras(decodeTraining(t, `{"distributed": {"fsdp": {"declared_via": "accelerate_config"}, "strategies": ["fsdp"]}}`))
-	want := [][2]string{{"Parallelism", "fsdp"}, {"FSDP", "enabled (via: accelerate_config)"}}
+	want := [][2]string{{"FSDP", "enabled (via: accelerate_config)"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
