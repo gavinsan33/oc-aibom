@@ -104,8 +104,8 @@ func CompareFields(items []AIBOM) []FieldRow {
 }
 
 // libraryDifferences narrows each run's Libraries value to the libraries
-// whose version isn't the same in every run ("—" where a run didn't import
-// it), plus how many others match, so a one-library change isn't a whole
+// whose version isn't the same in every run ("not imported" where a run
+// didn't import it), plus how many others match, so a one-library change isn't a whole
 // differing list. Runs that recorded no libraries stay empty and don't count.
 func libraryDifferences(items []AIBOM) []string {
 	recorded := []map[string]string{}
@@ -147,7 +147,7 @@ func libraryDifferences(items []AIBOM) []string {
 		for j, n := range differing {
 			v, ok := libs[n]
 			if !ok {
-				v = "—"
+				v = "not imported"
 			}
 			parts[j] = n + " " + v
 		}
