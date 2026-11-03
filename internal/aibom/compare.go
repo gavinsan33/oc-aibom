@@ -51,6 +51,13 @@ var compareFieldAccessors = []fieldAccessor{
 		}
 		return a.Data.Training.LRScheduler.Type
 	}},
+	{"Mixed Precision", func(a AIBOM) string { return training(a).MixedPrecision }},
+	{"Parallelization", func(a AIBOM) string { return training(a).ParallelizationStrategy }},
+	{"Parallelism", func(a AIBOM) string { return training(a).Distributed.Parallelism() }},
+	{"Topology", func(a AIBOM) string { return training(a).Distributed.Topology() }},
+	{"Parallel Sizes", func(a AIBOM) string { return training(a).Distributed.ParallelSizes() }},
+	{"FSDP", func(a AIBOM) string { return training(a).Distributed.FSDPSummary() }},
+	{"DeepSpeed", func(a AIBOM) string { return training(a).Distributed.DeepSpeedSummary() }},
 	{"GPU Type", func(a AIBOM) string { return a.Data.Environment.GPUType }},
 	{"GPU Count", func(a AIBOM) string { return fmt.Sprintf("%d", a.Data.Environment.GPUCount) }},
 	{"CUDA Version", func(a AIBOM) string { return a.Data.Environment.CUDAVersion }},
@@ -60,6 +67,15 @@ var compareFieldAccessors = []fieldAccessor{
 	{"Torch CUDA Version", func(a AIBOM) string { return a.Data.Environment.TorchCUDAVersion }},
 	{"Libraries", func(a AIBOM) string { return a.Data.Environment.LibraryList() }},
 	{"AIBOM Version", func(a AIBOM) string { return a.Data.Metadata.AIBOMVersion }},
+}
+
+// training is the AIBOM's training block, or an empty one for an AIBOM
+// without it (inference runs), so accessors need no nil check.
+func training(a AIBOM) Training {
+	if a.Data.Training == nil {
+		return Training{}
+	}
+	return *a.Data.Training
 }
 
 // CompareFields returns one FieldRow per compared field, with each AIBOM's

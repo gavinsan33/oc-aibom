@@ -195,3 +195,45 @@ func TestCompareRuntime(t *testing.T) {
 		t.Fatalf("unrecorded duration should be unavailable with no delta, got %+v", r)
 	}
 }
+
+func TestCompareFieldsParallelismAndPrecision(t *testing.T) {
+	n := func(v int) *int { return &v }
+	yes, no := true, false
+	fsdp := AIBOM{Data: Data{Training: &Training{
+		MixedPrecision: "bf16", MixedPrecisionDeclaredVia: "accelerator", ParallelizationStrategy: "fsdp",
+		Distributed: &Distributed{
+			WorldSize: n(3), Nodes: n(1), ProcessesPerNode: n(3), WorldDeclaredVia: "environment",
+			FSDP:       &DistributedFSDP{Version: n(2), ReshardAfterForward: &yes, CPUOffload: &no, DeclaredVia: "fsdp_module"},
+			Strategies: []string{"fsdp"},
+		},
+	}}}
+	deepspeed := AIBOM{Data: Data{Training: &Training{
+		MixedPrecision: "bf16", MixedPrecisionDeclaredVia: "deepspeed", ParallelizationStrategy: "deepspeed",
+		Distributed: &Distributed{
+			WorldSize: n(2), Nodes: n(1), ProcessesPerNode: n(2), WorldDeclaredVia: "cli_arg",
+			DeepSpeed:  &DistributedDeepSpeed{ZeroStage: n(3), OffloadOptimizer: "cpu", OffloadParam: "none"},
+			Strategies: []string{"deepspeed"},
+		},
+	}}}
+	rows := CompareFields([]AIBOM{fsdp, deepspeed, {}})
+	for label, want := range map[string][]string{
+		// Where a value was found doesn't make two runs differ.
+		"Mixed Precision": {"bf16", "bf16", ""},
+		"Parallelization": {"fsdp", "deepspeed", ""},
+		"Parallelism":     {"fsdp", "deepspeed", ""},
+		"Topology":        {"3 processes, 1 node, 3 per node", "2 processes, 1 node, 2 per node", ""},
+		"FSDP":            {"FSDP2, reshard after forward true, CPU offload false", "", ""},
+		"DeepSpeed":       {"", "ZeRO-3, optimizer offload cpu, param offload none", ""},
+	} {
+		r, ok := findField(rows, label)
+		if !ok || !reflect.DeepEqual(r.Values, want) {
+			t.Errorf("%s row = %+v, want %v", label, r, want)
+		}
+	}
+	if r, _ := findField(rows, "Mixed Precision"); !r.Differs {
+		t.Error("Mixed Precision should differ: the third AIBOM has none")
+	}
+	if r := CompareFields([]AIBOM{fsdp, fsdp}); r[0].Differs {
+		t.Error("identical runs differ")
+	}
+}
