@@ -200,8 +200,9 @@ type Training struct {
 	// How MixedPrecision was found: "accelerator", "deepspeed", "fsdp",
 	// "training_arguments", "fp8_hook", "autocast", "accelerate_env" or
 	// "cli_arg".
-	MixedPrecisionDeclaredVia string     `json:"mixed_precision_declared_via,omitempty"`
-	Precision                 *Precision `json:"precision,omitempty"`
+	MixedPrecisionDeclaredVia string       `json:"mixed_precision_declared_via,omitempty"`
+	Precision                 *Precision   `json:"precision,omitempty"`
+	Distributed               *Distributed `json:"distributed,omitempty"`
 	// All nil on AIBOMs from before the webhook recorded them, and whenever
 	// nothing was observed or declared.
 	OptimizerConfig *OptimizerConfig `json:"optimizer_config,omitempty"`
@@ -255,6 +256,49 @@ type FSDPMixedPrecision struct {
 	ReduceDtype string `json:"reduce_dtype,omitempty"`
 	BufferDtype string `json:"buffer_dtype,omitempty"`
 	OutputDtype string `json:"output_dtype,omitempty"`
+}
+
+// Distributed is the run's distributed topology. Each group says where it
+// was found: WorldDeclaredVia is "environment", "accelerator",
+// "accelerate_config" or "cli_arg"; ParallelSizesDeclaredVia "megatron",
+// "device_mesh", "cli_arg" or "deepspeed_engine". Strategies lists every
+// kind of parallelism seen ("data_parallel", "fsdp", "deepspeed",
+// "tensor_parallel", "pipeline_parallel", "context_parallel",
+// "expert_parallel"), so combinations like FSDP + TP are expressible.
+type Distributed struct {
+	WorldSize                *int                  `json:"world_size,omitempty"`
+	Nodes                    *int                  `json:"nodes,omitempty"`
+	ProcessesPerNode         *int                  `json:"processes_per_node,omitempty"`
+	WorldDeclaredVia         string                `json:"world_declared_via,omitempty"`
+	TensorParallelSize       *int                  `json:"tensor_parallel_size,omitempty"`
+	PipelineParallelSize     *int                  `json:"pipeline_parallel_size,omitempty"`
+	ContextParallelSize      *int                  `json:"context_parallel_size,omitempty"`
+	ExpertParallelSize       *int                  `json:"expert_parallel_size,omitempty"`
+	DataParallelSize         *int                  `json:"data_parallel_size,omitempty"`
+	ParallelSizesDeclaredVia string                `json:"parallel_sizes_declared_via,omitempty"`
+	DeviceMesh               map[string]int        `json:"device_mesh,omitempty"`
+	FSDP                     *DistributedFSDP      `json:"fsdp,omitempty"`
+	DeepSpeed                *DistributedDeepSpeed `json:"deepspeed,omitempty"`
+	Strategies               []string              `json:"strategies,omitempty"`
+}
+
+// DistributedFSDP: ShardingStrategy is FSDP1's name (FULL_SHARD,
+// HYBRID_SHARD, ...; HYBRID_SHARD also for FSDP2 on a 2-D mesh),
+// ReshardAfterForward FSDP2's switch.
+type DistributedFSDP struct {
+	Version             *int   `json:"version,omitempty"`
+	ShardingStrategy    string `json:"sharding_strategy,omitempty"`
+	ReshardAfterForward *bool  `json:"reshard_after_forward,omitempty"`
+	CPUOffload          *bool  `json:"cpu_offload,omitempty"`
+	DeclaredVia         string `json:"declared_via,omitempty"`
+}
+
+// DistributedDeepSpeed: the offload devices are "none", "cpu" or "nvme".
+type DistributedDeepSpeed struct {
+	ZeroStage        *int   `json:"zero_stage,omitempty"`
+	OffloadOptimizer string `json:"offload_optimizer,omitempty"`
+	OffloadParam     string `json:"offload_param,omitempty"`
+	DeclaredVia      string `json:"declared_via,omitempty"`
 }
 
 // LRScheduler comes from TrainingArguments or the training CLI. WarmupSteps
