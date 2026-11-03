@@ -154,73 +154,19 @@ func distributedLines(d aibom.Distributed) [][2]string {
 			out = append(out, [2]string{label, v})
 		}
 	}
-	add("Parallelism", strings.Join(d.Strategies, " + "))
-
-	world := []string{}
-	if d.WorldSize != nil {
-		world = append(world, fmt.Sprintf("%d processes", *d.WorldSize))
-	}
-	if d.Nodes != nil {
-		world = append(world, fmt.Sprintf("%d nodes", *d.Nodes))
-	}
-	if d.ProcessesPerNode != nil {
-		world = append(world, fmt.Sprintf("%d per node", *d.ProcessesPerNode))
-	}
-	add("Topology", withVia(strings.Join(world, ", "), d.WorldDeclaredVia))
-
-	sizes := []string{}
-	for _, s := range []struct {
-		name string
-		v    *int
-	}{{"tensor", d.TensorParallelSize}, {"pipeline", d.PipelineParallelSize}, {"context", d.ContextParallelSize},
-		{"expert", d.ExpertParallelSize}, {"data", d.DataParallelSize}} {
-		if s.v != nil {
-			sizes = append(sizes, fmt.Sprintf("%s %d", s.name, *s.v))
-		}
-	}
-	add("Parallel Sizes", withVia(strings.Join(sizes, ", "), d.ParallelSizesDeclaredVia))
+	add("Parallelism", d.Parallelism())
+	add("Topology", withVia(d.Topology(), d.WorldDeclaredVia))
+	add("Parallel Sizes", withVia(d.ParallelSizes(), d.ParallelSizesDeclaredVia))
 	mesh := make(map[string]any, len(d.DeviceMesh))
 	for k, v := range d.DeviceMesh {
 		mesh[k] = v
 	}
 	add("Device Mesh", formatSettings(mesh))
-
-	if f := d.FSDP; f != nil {
-		parts := []string{}
-		if f.Version != nil {
-			parts = append(parts, fmt.Sprintf("FSDP%d", *f.Version))
-		}
-		if f.ShardingStrategy != "" {
-			parts = append(parts, f.ShardingStrategy)
-		}
-		if f.ReshardAfterForward != nil {
-			parts = append(parts, fmt.Sprintf("reshard after forward %v", *f.ReshardAfterForward))
-		}
-		if f.CPUOffload != nil {
-			parts = append(parts, fmt.Sprintf("CPU offload %v", *f.CPUOffload))
-		}
-		v := strings.Join(parts, ", ")
-		if v == "" {
-			v = "enabled"
-		}
-		add("FSDP", withVia(v, f.DeclaredVia))
+	if d.FSDP != nil {
+		add("FSDP", withVia(d.FSDPSummary(), d.FSDP.DeclaredVia))
 	}
-	if z := d.DeepSpeed; z != nil {
-		parts := []string{}
-		if z.ZeroStage != nil {
-			parts = append(parts, fmt.Sprintf("ZeRO-%d", *z.ZeroStage))
-		}
-		if z.OffloadOptimizer != "" {
-			parts = append(parts, "optimizer offload "+z.OffloadOptimizer)
-		}
-		if z.OffloadParam != "" {
-			parts = append(parts, "param offload "+z.OffloadParam)
-		}
-		v := strings.Join(parts, ", ")
-		if v == "" {
-			v = "enabled"
-		}
-		add("DeepSpeed", withVia(v, z.DeclaredVia))
+	if d.DeepSpeed != nil {
+		add("DeepSpeed", withVia(d.DeepSpeedSummary(), d.DeepSpeed.DeclaredVia))
 	}
 	return out
 }
