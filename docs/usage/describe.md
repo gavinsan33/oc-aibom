@@ -1,7 +1,7 @@
-# oc aibom describe
+# oc aibomrun describe
 
 ```sh
-oc aibom describe <name>
+oc aibomrun describe <name>
 ```
 
 Prints a human-readable summary of a single AIBOM instead of a raw YAML dump:
@@ -14,7 +14,7 @@ Prints a human-readable summary of a single AIBOM instead of a raw YAML dump:
 
 ## Performance detail
 
-If the AIBOM was compiled with per-metric detail, a "Performance Detail" section shows each metric's min, avg, max and p95, and its first, middle and last-third breakdown across the run. Use `oc aibom graph` to see the full time series.
+If the AIBOM was compiled with per-metric detail, a "Performance Detail" section shows each metric's min, avg, max and p95, and its first, middle and last-third breakdown across the run. Use `oc aibomrun graph` to see the full time series.
 
 ## Inference performance
 

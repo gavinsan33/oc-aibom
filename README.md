@@ -2,7 +2,7 @@
 
 A `kubectl`/`oc` plugin that makes it easier to filter through and compare
 [AIBOM](https://github.com/gavinsan33/aibom-webhook-service) (`aibom.io/v1alpha1`)
-custom resources than raw `oc get aibom -o yaml`, using only the standard
+custom resources than raw `oc get aibomrun -o yaml`, using only the standard
 Kubernetes API.
 
 Examples below use `oc`, but since `oc` is a superset of `kubectl` and both
@@ -16,8 +16,14 @@ using this repo as a self-hosted plugin index:
 
 ```sh
 oc krew index add oc-aibom https://github.com/gavinsan33/oc-aibom.git
-oc krew install oc-aibom/aibom
+oc krew install oc-aibom/aibomrun
 ```
+
+Upgrading from the old `oc aibom` name: it installed as `kubectl-aibom`, the
+name of [k8s-aibom](https://github.com/GoogleCloudPlatform/k8s-aibom)'s krew
+plugin, so it was renamed to `oc aibomrun`. Remove the old plugin first
+(`oc krew uninstall aibom`, or delete `kubectl-aibom` and its two completion
+scripts from `/usr/local/bin` for a source install).
 
 Or build from source (requires Go 1.22+):
 
@@ -28,20 +34,20 @@ make install   # builds and installs to /usr/local/bin (override with INSTALL_DI
 Either way, invoke it as a plugin:
 
 ```sh
-oc aibom list
-oc aibom describe <name>
-oc aibom diff <name-a> <name-b>
-oc aibom compare <name> <name> [<name>...]
+oc aibomrun list
+oc aibomrun describe <name>
+oc aibomrun diff <name-a> <name-b>
+oc aibomrun compare <name> <name> [<name>...]
 ```
 
 ### Shell completion
 
 `kubectl`/`oc` don't call a plugin's own `__complete` command directly —
-they look on `PATH` for a companion executable named `kubectl_complete-aibom`
-(or `oc_complete-aibom`), and silently fall back to filename completion if
+they look on `PATH` for a companion executable named `kubectl_complete-aibomrun`
+(or `oc_complete-aibomrun`), and silently fall back to filename completion if
 it's missing. `make install` installs both companion scripts (from
-`completion/`) alongside the binary, so `oc aibom <TAB>` and
-`oc aibom list --<TAB>` work out of the box for source installs, as long as
+`completion/`) alongside the binary, so `oc aibomrun <TAB>` and
+`oc aibomrun list --<TAB>` work out of the box for source installs, as long as
 your shell has `oc`'s (or `kubectl`'s) own completion sourced, e.g.:
 
 ```sh
@@ -51,18 +57,18 @@ source <(oc completion zsh)   # or: source <(oc completion bash)
 krew installs don't get this automatically — krew only symlinks the
 manifest's `bin:` entry onto `PATH`, not the completion scripts bundled in
 the release tarball. To enable completion for a krew install, copy the
-extracted `kubectl_complete-aibom`/`oc_complete-aibom` files (from
-`~/.krew/store/aibom/<version>/`) into `~/.krew/bin` yourself.
+extracted `kubectl_complete-aibomrun`/`oc_complete-aibomrun` files (from
+`~/.krew/store/aibomrun/<version>/`) into `~/.krew/bin` yourself.
 
 ## Usage
 
-### `oc aibom`
+### `oc aibomrun`
 
 Run it with **no subcommand** on a terminal and it opens a full-screen,
-interactive browser — the quickest way in. It starts on the [`list`](#oc-aibom-list)
+interactive browser — the quickest way in. It starts on the [`list`](#oc-aibomrun-list)
 table; move a cursor through the rows and drill into `describe`, `compare` or
 `graph` without leaving the terminal. (Piped or redirected, it just prints the
-plain table, so `oc aibom | grep …` still works.) Any `list` flags
+plain table, so `oc aibomrun | grep …` still works.) Any `list` flags
 (`--sort-by`/`--ascending`/the filters below) seed its initial state.
 The sort you last applied from the `s` menu is remembered (in
 `~/.config/oc-aibom/prefs.json`, or your OS's user config directory) and
@@ -85,38 +91,38 @@ Inside the describe/compare/graph pages a `[d] Detail` / `[g] Graph` tab bar
 shows where you are; `d` and `g` switch between the two views of the same
 subject, and `q`/`esc` backs out to the list.
 
-### `oc aibom list`
+### `oc aibomrun list`
 
 Lists AIBOMs with the fields you'd otherwise have to dig for in `-o yaml`:
 job, model, experiment intent, quantization, GPU type, collection time.
 
 ```
-oc aibom list -n my-namespace
-oc aibom list -A                            # all namespaces
-oc aibom list --model=granite-3.0-8b        # filter by model.name
-oc aibom list --intent=sft                  # training | sft | inference
-oc aibom list --quantization=int4
-oc aibom list --architecture=llama          # filter by model.architecture
-oc aibom list --framework=vllm              # filter by model.framework
-oc aibom list --gpu-type=A100               # filter by environment.gpu_type
-oc aibom list --job=my-training-job         # filter by job name
-oc aibom list --git-branch=main             # filter by source_code.git_branch
-oc aibom list --git-repository=my-org/repo  # filter by source_code.git_repository
-oc aibom list --serving-engine=vllm         # filter by inference.serving_engine
-oc aibom list --adaptation-method=lora      # filter by fine_tuning.adaptation_method
-oc aibom list --optimizer=adamw             # filter by training.optimizer
-oc aibom list --drift-only                  # auto-detected dataset != declared dataset
-oc aibom list --sort-by=gpu-utilization     # rank by a performance metric (highest first)
-oc aibom list --sort-by=gpu-power --ascending
+oc aibomrun list -n my-namespace
+oc aibomrun list -A                            # all namespaces
+oc aibomrun list --model=granite-3.0-8b        # filter by model.name
+oc aibomrun list --intent=sft                  # training | sft | inference
+oc aibomrun list --quantization=int4
+oc aibomrun list --architecture=llama          # filter by model.architecture
+oc aibomrun list --framework=vllm              # filter by model.framework
+oc aibomrun list --gpu-type=A100               # filter by environment.gpu_type
+oc aibomrun list --job=my-training-job         # filter by job name
+oc aibomrun list --git-branch=main             # filter by source_code.git_branch
+oc aibomrun list --git-repository=my-org/repo  # filter by source_code.git_repository
+oc aibomrun list --serving-engine=vllm         # filter by inference.serving_engine
+oc aibomrun list --adaptation-method=lora      # filter by fine_tuning.adaptation_method
+oc aibomrun list --optimizer=adamw             # filter by training.optimizer
+oc aibomrun list --drift-only                  # auto-detected dataset != declared dataset
+oc aibomrun list --sort-by=gpu-utilization     # rank by a performance metric (highest first)
+oc aibomrun list --sort-by=gpu-power --ascending
 ```
 
 All filters are exact-match, case-insensitive, and can be combined (AND'd
 together). `--sort-by` accepts: `gpu-utilization`, `gpu-memory`, `gpu-power`,
 `cpu-usage`, `memory-usage`, `network-rx`, `network-tx` — and adds the
-corresponding column to the table. Run `oc aibom` with no subcommand to browse
-this table [interactively](#oc-aibom).
+corresponding column to the table. Run `oc aibomrun` with no subcommand to browse
+this table [interactively](#oc-aibomrun).
 
-### `oc aibom describe <name>`
+### `oc aibomrun describe <name>`
 
 Prints a human-readable summary of a single AIBOM's model, dataset
 (declared vs. auto-detected, flagging mismatches), source provenance,
@@ -126,7 +132,7 @@ compiled with per-metric detail (aibom-webhook-service's segmented telemetry
 stats — see its `CLAUDE.md`), a "Performance Detail" section also shows each
 metric's min/avg/max/p95 and its first→middle→last-third breakdown across
 the run — something a single run-wide average can't show. Use
-`oc aibom graph` to see the full time series.
+`oc aibomrun graph` to see the full time series.
 
 For an inference AIBOM whose serving engine has its own telemetry (vLLM
 today — see aibom-webhook-service's CLAUDE.md, "Inference Performance
@@ -184,7 +190,7 @@ stored series print no such line.
   `aibomtelemetries`, no cluster, or a reference shape this version doesn't
   understand, such as the short-lived ConfigMap form).
 
-### `oc aibom graph <name> [<name>...]`
+### `oc aibomrun graph <name> [<name>...]`
 
 Charts AIBOMs' stored telemetry time series (the `AIBOMTelemetry` object each
 `telemetry_series_ref` points at — see aibom-webhook-service's `CLAUDE.md`,
@@ -228,13 +234,13 @@ When stdout isn't a terminal (or with `--text`) it prints one sparkline row
 per run per metric instead, which is handy in logs and pipes.
 
 ```
-oc aibom graph my-run
-oc aibom graph run1 run2 run3 --metric gpu_utilization,memory_usage
-oc aibom graph run1 run2 --pods
-oc aibom graph run1 run2 --text --width 100
+oc aibomrun graph my-run
+oc aibomrun graph run1 run2 run3 --metric gpu_utilization,memory_usage
+oc aibomrun graph run1 run2 --pods
+oc aibomrun graph run1 run2 --text --width 100
 ```
 
-### `oc aibom compare <name> <name> [<name>...]`
+### `oc aibomrun compare <name> <name> [<name>...]`
 
 Side-by-side comparison of two or more AIBOMs, mirroring the console plugin's
 compare view: a Fields table (model config, dataset declaration/drift, git
@@ -243,7 +249,7 @@ with differing fields marked `*`) and a Hardware Performance table (runtime, the
 metric's average; one column per run, plus delta/percent-change columns when exactly two are compared).
 Pass `--changed` to show only the fields that differ.
 
-### `oc aibom diff <name-a> <name-b>`
+### `oc aibomrun diff <name-a> <name-b>`
 
 Convenience alias for `compare <name-a> <name-b> --changed` — the same tables,
 with the Fields table reduced to just what differs between the two runs.
@@ -268,7 +274,7 @@ structs mirroring `compile_aibom()`'s output for typed filtering/diffing.
 
 Pushing a `v*` tag runs `.github/workflows/release.yaml`, which builds
 cross-platform archives with `make dist` and publishes them as a GitHub
-release. `plugins/aibom.yaml` is the krew manifest for this repo's index —
+release. `plugins/aibomrun.yaml` is the krew manifest for this repo's index —
 after cutting a release, update its `sha256` fields from the **release's own
 `checksums.txt` asset** (`gh release download <tag> -p checksums.txt`), not
 from a local `make dist` rebuild — Go builds aren't bit-for-bit reproducible
@@ -279,12 +285,12 @@ To test the manifest locally before/without a release:
 
 ```sh
 make dist VERSION=v0.0.0-dev
-kubectl krew install --manifest=plugins/aibom.yaml --archive=dist/kubectl-aibom_v0.0.0-dev_linux_amd64.tar.gz
+kubectl krew install --manifest=plugins/aibomrun.yaml --archive=dist/kubectl-aibomrun_v0.0.0-dev_linux_amd64.tar.gz
 ```
 
 ## Makefile targets
 
-- `make build` — build `./kubectl-aibom`
+- `make build` — build `./kubectl-aibomrun`
 - `make install` — build and install the binary + shell-completion companion scripts to `/usr/local/bin` (or `INSTALL_DIR`)
 - `make uninstall` — remove the installed binary + completion scripts from `INSTALL_DIR`
 - `make dist` — cross-compile release tarballs (binary + completion scripts) + `checksums.txt` into `dist/` for krew
@@ -298,6 +304,6 @@ kubectl krew install --manifest=plugins/aibom.yaml --archive=dist/kubectl-aibom_
 ## Project structure
 
 ```
-cmd/kubectl-aibom/   CLI entrypoint (cobra commands, table/summary output, graph TUI)
+cmd/kubectl-aibomrun/   CLI entrypoint (cobra commands, table/summary output, graph TUI)
 internal/aibom/      AIBOM types, dynamic-client queries, filter/diff logic
 ```

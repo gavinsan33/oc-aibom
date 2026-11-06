@@ -1,30 +1,30 @@
-# oc aibom list
+# oc aibomrun list
 
 Lists AIBOMs with the fields you'd otherwise have to dig for in `-o yaml`: job, model, experiment intent, quantization, GPU type, and collection time.
 
 ```sh
-oc aibom list -n my-namespace
-oc aibom list -A                            # all namespaces
-oc aibom list --model=granite-3.0-8b        # filter by model.name
-oc aibom list --intent=sft                  # training | sft | inference
-oc aibom list --quantization=int4
-oc aibom list --architecture=llama          # filter by model.architecture
-oc aibom list --framework=vllm              # filter by model.framework
-oc aibom list --gpu-type=A100               # filter by environment.gpu_type
-oc aibom list --job=my-training-job         # filter by job name
-oc aibom list --git-branch=main             # filter by source_code.git_branch
-oc aibom list --git-repository=my-org/repo  # filter by source_code.git_repository
-oc aibom list --serving-engine=vllm         # filter by inference.serving_engine
-oc aibom list --adaptation-method=lora      # filter by fine_tuning.adaptation_method
-oc aibom list --optimizer=adamw             # filter by training.optimizer
-oc aibom list --drift-only                  # auto-detected dataset != declared dataset
-oc aibom list --sort-by=gpu-utilization     # rank by a performance metric (highest first)
-oc aibom list --sort-by=gpu-power --ascending
+oc aibomrun list -n my-namespace
+oc aibomrun list -A                            # all namespaces
+oc aibomrun list --model=granite-3.0-8b        # filter by model.name
+oc aibomrun list --intent=sft                  # training | sft | inference
+oc aibomrun list --quantization=int4
+oc aibomrun list --architecture=llama          # filter by model.architecture
+oc aibomrun list --framework=vllm              # filter by model.framework
+oc aibomrun list --gpu-type=A100               # filter by environment.gpu_type
+oc aibomrun list --job=my-training-job         # filter by job name
+oc aibomrun list --git-branch=main             # filter by source_code.git_branch
+oc aibomrun list --git-repository=my-org/repo  # filter by source_code.git_repository
+oc aibomrun list --serving-engine=vllm         # filter by inference.serving_engine
+oc aibomrun list --adaptation-method=lora      # filter by fine_tuning.adaptation_method
+oc aibomrun list --optimizer=adamw             # filter by training.optimizer
+oc aibomrun list --drift-only                  # auto-detected dataset != declared dataset
+oc aibomrun list --sort-by=gpu-utilization     # rank by a performance metric (highest first)
+oc aibomrun list --sort-by=gpu-power --ascending
 ```
 
 ## Interactive browser
 
-Run `oc aibom` with no subcommand on a terminal (stdout not piped) and it opens a full-screen browser over the same table: move a cursor through the rows and drill into a single AIBOM's `describe`, a side-by-side `compare` of several, or the overlaid `graph` view — without leaving the terminal. Piping (`oc aibom | grep …`) still prints the plain table. Any `--sort-by`/`--ascending`/filter flags you pass seed the browser's initial state.
+Run `oc aibomrun` with no subcommand on a terminal (stdout not piped) and it opens a full-screen browser over the same table: move a cursor through the rows and drill into a single AIBOM's `describe`, a side-by-side `compare` of several, or the overlaid `graph` view — without leaving the terminal. Piping (`oc aibomrun | grep …`) still prints the plain table. Any `--sort-by`/`--ascending`/filter flags you pass seed the browser's initial state.
 
 ### Keys
 
