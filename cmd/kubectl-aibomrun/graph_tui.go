@@ -371,7 +371,7 @@ func (m graphModel) View() string {
 	if len(m.runs) > 1 {
 		legend = append(legend, lipgloss.NewStyle().Foreground(overlapColor).Render("■ overlap"))
 	}
-	header := lipgloss.NewStyle().Bold(true).Render("oc aibom graph") + "  " + strings.Join(legend, "  ") +
+	header := lipgloss.NewStyle().Bold(true).Render("oc aibomrun graph") + "  " + strings.Join(legend, "  ") +
 		lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("   0 → %s elapsed", fmtElapsed(m.sharedMax)))
 	stats := m.statsLines()
 	exit := "q quit"

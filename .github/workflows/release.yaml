@@ -45,18 +45,18 @@ jobs:
           git fetch origin main
           git checkout main
 
-          OLD_VERSION=$(grep -m1 '^  version:' plugins/aibom.yaml | awk '{print $2}')
+          OLD_VERSION=$(grep -m1 '^  version:' plugins/aibomrun.yaml | awk '{print $2}')
           NEW_VERSION="${{ github.ref_name }}"
-          sed -i "s/${OLD_VERSION}/${NEW_VERSION}/g" plugins/aibom.yaml
+          sed -i "s/${OLD_VERSION}/${NEW_VERSION}/g" plugins/aibomrun.yaml
 
           while read -r hash file; do
             awk -v file="$file" -v hash="$hash" '
               $0 ~ file { print; getline; sub(/sha256: .*/, "sha256: " hash); print; next }
               { print }
-            ' plugins/aibom.yaml > plugins/aibom.yaml.tmp
-            mv plugins/aibom.yaml.tmp plugins/aibom.yaml
+            ' plugins/aibomrun.yaml > plugins/aibomrun.yaml.tmp
+            mv plugins/aibomrun.yaml.tmp plugins/aibomrun.yaml
           done < dist/checksums.txt
 
-          git add plugins/aibom.yaml
+          git add plugins/aibomrun.yaml
           git diff --cached --quiet || git commit -m "Point krew manifest at ${NEW_VERSION}"
           git push origin main

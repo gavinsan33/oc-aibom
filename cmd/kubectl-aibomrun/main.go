@@ -1,6 +1,6 @@
-// Command kubectl-aibom is a kubectl/oc plugin (invoked as `kubectl aibom`
-// or `oc aibom`) that makes it easier to list, inspect, and compare AIBOM
-// custom resources (group aibom.io) than raw `oc get aibom -o yaml`.
+// Command kubectl-aibomrun is a kubectl/oc plugin (invoked as `kubectl aibomrun`
+// or `oc aibomrun`) that makes it easier to list, inspect, and compare AIBOM
+// custom resources (group aibom.io) than raw `oc get aibomrun -o yaml`.
 package main
 
 import (
@@ -25,7 +25,7 @@ func main() {
 
 	var noColor bool
 	root := &cobra.Command{
-		Use:   "aibom",
+		Use:   "aibomrun",
 		Short: "List, inspect, and compare AIBOM custom resources",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			initColor(noColor)
@@ -56,9 +56,9 @@ func main() {
 	}
 	listOpts.register(listCmd)
 
-	// With no subcommand, `oc aibom` opens the interactive browser on a
+	// With no subcommand, `oc aibomrun` opens the interactive browser on a
 	// terminal, falling back to the plain `list` output when stdout is piped
-	// or redirected (so `oc aibom | grep` still works). Explicit subcommands
+	// or redirected (so `oc aibomrun | grep` still works). Explicit subcommands
 	// are always print-only.
 	root.Args = cobra.NoArgs
 	root.RunE = func(cmd *cobra.Command, args []string) error {

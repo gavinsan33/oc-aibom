@@ -1,16 +1,16 @@
-# oc aibom graph
+# oc aibomrun graph
 
 ```sh
-oc aibom graph <name> [<name>...]
+oc aibomrun graph <name> [<name>...]
 ```
 
 Charts the telemetry time series stored with one or more AIBOMs. The series are the downsampled per-metric lines `aibom-webhook-service` saves in an `AIBOMTelemetry` object when a run completes, so this works long after Prometheus's retention window has passed. AIBOMs created without a stored series (older ones, or runs where Prometheus had no data) are left out with a note.
 
 ```sh
-oc aibom graph my-run
-oc aibom graph run1 run2 run3 --metric gpu_utilization,memory_usage
-oc aibom graph run1 run2 --pods
-oc aibom graph run1 run2 --text --width 100
+oc aibomrun graph my-run
+oc aibomrun graph run1 run2 run3 --metric gpu_utilization,memory_usage
+oc aibomrun graph run1 run2 --pods
+oc aibomrun graph run1 run2 --text --width 100
 ```
 
 ## Interactive view
