@@ -19,9 +19,8 @@ records for each AI workload run, without digging through
 `oc get aibomrun -o yaml`. It also verifies each AIBOM's signature. It uses only
 the standard Kubernetes API, and works the same with `kubectl` as with `oc`.
 
-**Full documentation lives in [`docs/`](docs/index.md)** and on the
-[docs site](https://gavinsan33.github.io/project-aibom/oc-aibom/). This README
-only covers what the plugin does and how to install it.
+**Full documentation lives on the [docs site](https://gavinsan33.github.io/project-aibom/oc-aibom/).** This README only
+covers what the plugin does and how to install it.
 
 ## Install
 
@@ -39,7 +38,7 @@ make install
 ```
 
 Upgrading from the old `oc aibom` name? Remove that plugin first; see
-[Upgrading](docs/install.md#upgrading-from-oc-aibom).
+[Upgrading](https://gavinsan33.github.io/project-aibom/oc-aibom/install/#upgrading-from-oc-aibom).
 
 ## Usage
 
@@ -54,14 +53,32 @@ oc aibomrun graph <name> [<name>...]      # stored telemetry, overlaid per run
 
 It accepts the usual connection flags (`-n`, `-A`, `--context`, `--kubeconfig`, ...).
 
+Run with no subcommand on a terminal, it opens an interactive browser:
+
+| Key | Action |
+|-----|--------|
+| `↑` `↓`, `k` `j` | Move the cursor (`home`/`end`, `G` jump to ends) |
+| `←` `→`, `h` `l` | Scroll a wide table sideways |
+| `space` | Select / deselect the row |
+| `enter` | Describe the row, or compare when two or more are selected |
+| `g` | Graph the selection (or the row under the cursor) |
+| `s` | Open the sort menu |
+| `f`, `/` | Open the live filter prompt |
+| `esc` | Clear the selection |
+| `q`, `ctrl+c` | Quit |
+
+Inside describe, compare and graph, `d` and `g` switch between the detail and
+graph views, and `q`/`esc` goes back to the list. The graph view has its own
+keys; see [graph](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/graph/#keys).
+
 ![Two runs compared across GPU, CPU, memory and network panels](docs/img/graph-grid-overview.png)
 
 ## Documentation
 
-- [Install](docs/install.md): krew, source builds, shell completion, upgrading
-- [list](docs/usage/list.md): filters, sorting, and the interactive browser's keys
-- [describe](docs/usage/describe.md): every section, and what each signature and telemetry status means
-- [diff and compare](docs/usage/diff-compare.md)
-- [graph](docs/usage/graph.md): the chart view, its keys, and text output
-- [Flags](docs/reference/flags.md)
-- [Development](docs/reference/development.md): Makefile targets, project layout, releasing
+- [Install](https://gavinsan33.github.io/project-aibom/oc-aibom/install/): krew, source builds, shell completion, upgrading
+- [list](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/list/): filters, sorting, and the interactive browser's keys
+- [describe](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/describe/): every section, and what each signature and telemetry status means
+- [diff and compare](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/diff-compare/)
+- [graph](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/graph/): the chart view, its keys, and text output
+- [Flags](https://gavinsan33.github.io/project-aibom/oc-aibom/reference/flags/)
+- [Development](https://gavinsan33.github.io/project-aibom/oc-aibom/reference/development/): Makefile targets, project layout, releasing
