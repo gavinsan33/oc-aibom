@@ -10,6 +10,7 @@
   <a href="https://gavinsan33.github.io/project-aibom/oc-aibom/"><img src="https://img.shields.io/badge/docs-Project%20AIBOM-00897b?logo=materialformkdocs&logoColor=white" alt="Documentation"></a>
   <a href="https://github.com/gavinsan33/oc-aibom/releases/latest"><img src="https://img.shields.io/github/v/release/gavinsan33/oc-aibom?label=version" alt="Version"></a>
   <a href="https://github.com/gavinsan33/oc-aibom/blob/main/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/gavinsan33/oc-aibom" alt="Go version"></a>
+  <a href="https://github.com/gavinsan33/oc-aibom/blob/main/LICENSE"><img src="https://img.shields.io/github/license/gavinsan33/oc-aibom" alt="License"></a>
 </p>
 
 A `kubectl`/`oc` plugin for browsing, filtering and comparing the `AIBOM`
