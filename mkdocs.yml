@@ -28,3 +28,4 @@ nav:
       - graph: usage/graph.md
   - Reference:
       - Flags: reference/flags.md
+      - Development: reference/development.md
