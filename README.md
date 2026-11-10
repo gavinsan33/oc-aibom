@@ -1,3 +1,5 @@
+<img src=".github/logo.svg" alt="Project AIBOM logo" width="80">
+
 # oc-aibom
 
 A `kubectl`/`oc` plugin that makes it easier to filter through and compare
