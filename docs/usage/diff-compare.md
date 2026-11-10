@@ -1,10 +1,10 @@
-# oc aibom compare and diff
+# oc aibomrun compare and diff
 
 ## compare
 
 ```sh
-oc aibom compare <name> <name> [<name>...]
-oc aibom compare <name> <name> --changed
+oc aibomrun compare <name> <name> [<name>...]
+oc aibomrun compare <name> <name> --changed
 ```
 
 A side-by-side comparison of two or more AIBOMs, matching the console plugin's
@@ -25,7 +25,7 @@ what differs.
 ## diff
 
 ```sh
-oc aibom diff <name-a> <name-b>
+oc aibomrun diff <name-a> <name-b>
 ```
 
 A convenience alias for `compare <name-a> <name-b> --changed`: the same two

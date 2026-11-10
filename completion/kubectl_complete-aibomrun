@@ -4,4 +4,4 @@
 # does not call a plugin binary's own `__complete` directly. This just
 # forwards to it.
 # https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/#optionally-add-a-plugin-completion-file
-exec kubectl-aibom __complete "$@"
+exec kubectl-aibomrun __complete "$@"

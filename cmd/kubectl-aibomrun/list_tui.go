@@ -14,7 +14,7 @@ import (
 	"github.com/gsanders/oc-aibom/internal/aibom"
 )
 
-// The interactive browser `oc aibom` opens with no arguments: a cursor over
+// The interactive browser `oc aibomrun` opens with no arguments: a cursor over
 // the `list` table that drills into a scrollable describe view (one AIBOM),
 // a side-by-side compare (two or more selected), or the overlaid graph TUI,
 // without leaving the terminal.
@@ -498,7 +498,7 @@ func (m listModel) View() string {
 
 func (m listModel) listView() string {
 	faint := lipgloss.NewStyle().Faint(true)
-	title := lipgloss.NewStyle().Bold(true).Render("oc aibom") + faint.Render(fmt.Sprintf("  %d AIBOMs", len(m.items)))
+	title := lipgloss.NewStyle().Bold(true).Render("oc aibomrun") + faint.Render(fmt.Sprintf("  %d AIBOMs", len(m.items)))
 	if m.filter != "" && m.mode != modeFilter {
 		title += faint.Render(fmt.Sprintf(" · filter: %q", m.filter))
 	}
