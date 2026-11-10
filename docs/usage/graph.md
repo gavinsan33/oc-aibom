@@ -27,6 +27,10 @@ Press `enter` to zoom the selected metric full screen.
 
 ![GPU utilization zoomed, with two runs crossing](../img/graph-zoom-gpu-utilization.png)
 
+### Limit lines
+
+Hardware limits draw as red lines. When the runs' limits differ, each distinct limit gets its own line, starting with a `■` in the color of each run it belongs to, and each run's stats line gives its own limit. Runs that all share one limit get a single line. In text output the limits appear in the same places, as `limit 8.00 GiB` or `no limit`.
+
 ### Overlapping lines
 
 A terminal cell can only hold one color, so where two runs' lines land in the same cell one would normally hide the other. Cells where the runs' points actually coincide are drawn white (the `■ overlap` entry in the header). In a cell that only holds points from several runs without coinciding, the run with the most points there wins.

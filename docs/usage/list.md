@@ -42,6 +42,8 @@ Run `oc aibomrun` with no subcommand on a terminal (stdout not piped) and it ope
 
 In the **sort** menu: `↑`/`↓` pick a field (age plus the `--sort-by` metrics), `space` or `←`/`→` flips the direction, `enter` applies, `esc` cancels.
 
+The sort you last applied from this menu is remembered (in `~/.config/oc-aibom/prefs.json`, or your OS's user config directory) and restored the next time the browser opens, unless you pass `--sort-by` or `--ascending`. The plain `list` output always follows its flags.
+
 In the **filter** prompt: type to narrow the list live (a case-insensitive substring over the visible columns), `enter` keeps the filter, `esc` clears it.
 
 Inside the describe/compare/graph pages, a `[d] Detail view` / `[g] Graph view` tab bar shows where you are; `d` and `g` switch between the two views of the same subject, and `q`/`esc` backs out to the list.
