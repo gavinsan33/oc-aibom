@@ -1,6 +1,4 @@
-<img src=".github/logo.svg" alt="Project AIBOM logo" width="80">
-
-# oc-aibom
+# <img src=".github/logo.svg" alt="" width="36"> oc-aibom
 
 A `kubectl`/`oc` plugin that makes it easier to filter through and compare
 [AIBOM](https://github.com/gavinsan33/aibom-webhook-service) (`aibom.io/v1alpha1`)
