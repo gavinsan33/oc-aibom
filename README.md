@@ -1,4 +1,16 @@
-# oc-aibom
+<p align="center">
+  <img src=".github/logo.svg" alt="" width="128">
+</p>
+
+<h1 align="center">oc-aibom</h1>
+
+<p align="center"><strong>List, inspect, diff and compare AIBOMs from the terminal</strong></p>
+
+<p align="center">
+  <a href="https://gavinsan33.github.io/project-aibom/oc-aibom/"><img src="https://img.shields.io/badge/docs-Project%20AIBOM-00897b?logo=materialformkdocs&logoColor=white" alt="Documentation"></a>
+  <a href="https://github.com/gavinsan33/oc-aibom/releases/latest"><img src="https://img.shields.io/github/v/release/gavinsan33/oc-aibom?label=version" alt="Version"></a>
+  <a href="https://github.com/gavinsan33/oc-aibom/blob/main/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/gavinsan33/oc-aibom" alt="Go version"></a>
+</p>
 
 A `kubectl`/`oc` plugin that makes it easier to filter through and compare
 [AIBOM](https://github.com/gavinsan33/aibom-webhook-service) (`aibom.io/v1alpha1`)
