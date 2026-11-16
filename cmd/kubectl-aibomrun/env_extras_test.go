@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -25,6 +26,27 @@ func TestEnvironmentExtras(t *testing.T) {
 	}
 	if n := len(environmentExtras(aibom.Environment{})); n != 0 {
 		t.Fatalf("an AIBOM without these fields should print nothing extra, got %d lines", n)
+	}
+}
+
+// aibom-webhook #209 stores numbers and lists; decoded from JSON as a real
+// AIBOM is, they read the same as the older string forms.
+func TestEnvironmentExtrasTypedValues(t *testing.T) {
+	var e aibom.Environment
+	if err := json.Unmarshal([]byte(`{
+		"cpu": {"cpu_cores_per_socket": 64},
+		"network": {"rdma_devices": ["mlx5_0", "mlx5_1"], "primary_mtu": 9000},
+		"storage": {"block_devices": [{"name": "nvme0n1", "size": "894G"}, {"name": "sda", "size": "1T"}]}
+	}`), &e); err != nil {
+		t.Fatal(err)
+	}
+	want := [][2]string{
+		{"CPU Details", "cores/socket 64"},
+		{"Network", "RDMA devices mlx5_0, mlx5_1, MTU 9000"},
+		{"Block Devices", "nvme0n1 894G, sda 1T"},
+	}
+	if got := environmentExtras(e); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 

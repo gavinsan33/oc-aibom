@@ -25,10 +25,23 @@ func environmentExtras(e aibom.Environment) [][2]string {
 		}
 	}
 	get := func(m map[string]any, k string) string {
-		if v, ok := m[k]; ok {
-			return strings.Join(strings.Fields(strings.ReplaceAll(fmt.Sprint(v), "\n", ", ")), " ")
+		v, ok := m[k]
+		if !ok {
+			return ""
 		}
-		return ""
+		// Lists since aibom-webhook #209: rdma_devices names, block_devices
+		// {name, size}. Older AIBOMs have comma- or newline-joined strings.
+		if list, ok := v.([]any); ok {
+			parts := make([]string, 0, len(list))
+			for _, item := range list {
+				if d, ok := item.(map[string]any); ok {
+					item = strings.TrimSpace(fmt.Sprint(d["name"], " ", d["size"]))
+				}
+				parts = append(parts, fmt.Sprint(item))
+			}
+			return strings.Join(parts, ", ")
+		}
+		return strings.Join(strings.Fields(strings.ReplaceAll(fmt.Sprint(v), "\n", ", ")), " ")
 	}
 	labeled := func(label, v string) string {
 		if v == "" {
