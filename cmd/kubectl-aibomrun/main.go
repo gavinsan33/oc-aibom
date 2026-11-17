@@ -195,7 +195,39 @@ func main() {
 	graphCmd.Flags().BoolVar(&graphText, "text", false, "print sparklines instead of opening the interactive full-screen view (automatic when stdout isn't a terminal)")
 	graphCmd.Flags().IntVar(&graphWidth, "width", 0, "text-mode graph width in columns (default: terminal width)")
 
-	root.AddCommand(listCmd, getCmd, diffCmd, compareCmd, graphCmd)
+	exportCmd := &cobra.Command{
+		Use:   "export <name>",
+		Short: "Print one AIBOM as a CycloneDX 1.6 JSON document",
+		Long: `Print one AIBOM as a CycloneDX 1.6 JSON document on stdout. Nothing is
+written to the cluster or to disk. The mapping is aibom-webhook-service's
+docs/reference/cyclonedx-mapping.md. The record's signature is checked as in
+describe; if it isn't valid, a warning goes to stderr and the document is
+still printed.`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeAIBOMNames(configFlags, 1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, namespace, err := buildClient(configFlags)
+			if err != nil {
+				return err
+			}
+			ctx := context.Background()
+			a, err := aibom.Get(ctx, client, namespace, args[0])
+			if err != nil {
+				return err
+			}
+			if r := aibom.Verify(ctx, client, a); r.Status != aibom.VerifyValid {
+				fmt.Fprintf(os.Stderr, "warning: record signature not verified: %s\n", r.Detail)
+			}
+			doc, err := aibom.CycloneDX(a)
+			if err != nil {
+				return err
+			}
+			_, err = os.Stdout.Write(doc)
+			return err
+		},
+	}
+
+	root.AddCommand(listCmd, getCmd, diffCmd, compareCmd, graphCmd, exportCmd)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

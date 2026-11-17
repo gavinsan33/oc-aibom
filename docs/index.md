@@ -14,6 +14,7 @@ Examples use `oc`, but `oc` is a superset of `kubectl` and both use the same plu
 | `oc aibomrun diff <name-a> <name-b>` | Field-by-field comparison of two AIBOMs |
 | `oc aibomrun compare <name> <name> [<name>...]` | Side-by-side performance table across runs |
 | `oc aibomrun graph <name> [<name>...]` | Interactive terminal charts of the stored telemetry time series, with runs overlaid |
+| `oc aibomrun export <name>` | Print one AIBOM as a CycloneDX 1.6 JSON document on stdout |
 
 This plugin reads `aiboms.aibom.io`, the run records written by aibom-webhook-service. [k8s-aibom](https://github.com/GoogleCloudPlatform/k8s-aibom) defines a different `AIBOM` kind (`aibom.k8saibom.dev`) and has its own `kubectl aibom` plugin; the two can be installed side by side.
 
