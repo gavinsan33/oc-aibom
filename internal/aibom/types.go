@@ -84,6 +84,17 @@ type Pod struct {
 	StartTime    string `json:"start_time"`
 	Status       string `json:"status"`
 	ExitCode     *int   `json:"exit_code"`
+	// The pod's own GPU count (its claim, else what discovery saw) and its
+	// app containers' images, both absent on AIBOMs from before aibom-webhook
+	// #115/#208. ImageID is the kubelet-reported image, with the digest.
+	GPUCount   *int           `json:"gpu_count,omitempty"`
+	Containers []PodContainer `json:"containers,omitempty"`
+}
+
+type PodContainer struct {
+	Name    string `json:"name"`
+	Image   string `json:"image"`
+	ImageID string `json:"image_id"`
 }
 
 // ExecutionMetadata's DurationSeconds is a pointer since compile_aibom()
@@ -397,6 +408,9 @@ type Environment struct {
 	DriverVersion    string  `json:"driver_version"`
 	FrameworkVersion string  `json:"framework_version"`
 	KernelVersion    string  `json:"kernel_version"`
+	// Distinct nodes of the GPU pods GPUCount adds up (aibom-webhook #115);
+	// nil on older AIBOMs, whose GPUCount is the first pod's only.
+	NodeCount *int `json:"node_count,omitempty"`
 	// Optional sections from the discovery snapshot (all absent on older
 	// AIBOMs). Values come straight from shell output, so they're loosely
 	// typed and only ever displayed.
