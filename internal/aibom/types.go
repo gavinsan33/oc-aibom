@@ -493,9 +493,7 @@ type MetricStats struct {
 }
 
 type Metadata struct {
-	AIBOMVersion     string `json:"aibom_version"`
-	GeneratedAt      string `json:"generated_at"`
-	Generator        string `json:"generator"`
-	SchemaCompliance string `json:"schema_compliance"`
-	DatasetDetection string `json:"dataset_detection"`
+	AIBOMVersion string `json:"aibom_version"`
+	GeneratedAt  string `json:"generated_at"`
+	Generator    string `json:"generator"`
 }

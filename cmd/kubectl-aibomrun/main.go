@@ -793,8 +793,6 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		fmt.Fprintf(w, "  Version:            %s\n", a.Data.Metadata.AIBOMVersion)
 		fmt.Fprintf(w, "  Generated At:       %s\n", a.Data.Metadata.GeneratedAt)
 		fmt.Fprintf(w, "  Generator:          %s\n", a.Data.Metadata.Generator)
-		fmt.Fprintf(w, "  Schema Compliance:  %s\n", a.Data.Metadata.SchemaCompliance)
-		fmt.Fprintf(w, "  Dataset Detection:  %s\n", a.Data.Metadata.DatasetDetection)
 	}
 }
 
