@@ -19,7 +19,7 @@ func sha256Hex(s string) string {
 
 func newTelemetryObject(namespace, name string, spec map[string]any) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": "aibom.io/v1alpha1",
+		"apiVersion": "aibom.io/v1",
 		"kind":       "AIBOMTelemetry",
 		"metadata":   map[string]any{"name": name, "namespace": namespace},
 		"spec":       spec,

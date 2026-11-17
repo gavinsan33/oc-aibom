@@ -8,7 +8,7 @@ spec:
   shortDescription: List, inspect, and compare AIBOM custom resources
   description: |
     oc-aibom makes it easier to filter through and compare AIBOM
-    (aibom.io/v1alpha1) custom resources than raw `oc get aibomrun -o yaml`,
+    (aibom.io/v1) custom resources than raw `oc get aibomrun -o yaml`,
     using only the standard Kubernetes API.
 
     Usage:
