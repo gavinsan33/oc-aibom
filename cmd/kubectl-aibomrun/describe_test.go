@@ -79,3 +79,22 @@ func TestWithUnitUsesShortNames(t *testing.T) {
 		}
 	}
 }
+
+// aibom-webhook #115/#208: per-pod GPU counts, images and the node count.
+func TestDescribeShowsPodGPUsImagesAndNodes(t *testing.T) {
+	var data aibom.Data
+	raw := `{"environment": {"gpu_type": "H100", "gpu_count": 16, "node_count": 2},
+	  "execution_metadata": {"pods": [{"pod_name": "p0", "gpu_count": 8, "containers": [
+	    {"name": "train", "image": "quay.io/x/train:v1", "image_id": "quay.io/x/train@sha256:abc"}]}]}}`
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	printDescribe(&buf, aibom.AIBOM{Name: "a", Data: data}, aibom.VerifyResult{}, aibom.SeriesResult{}, false)
+	out := buf.String()
+	for _, want := range []string{"H100 x16 (2 nodes)", "gpus=8", "    train  image=quay.io/x/train:v1  id=quay.io/x/train@sha256:abc"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}

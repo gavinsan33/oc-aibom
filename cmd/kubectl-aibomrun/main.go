@@ -699,7 +699,11 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Environment:")
-	fmt.Fprintf(w, "  GPU:           %s x%d\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount)
+	gpuNodes := ""
+	if n := a.Data.Environment.NodeCount; n != nil && *n > 1 {
+		gpuNodes = fmt.Sprintf(" (%d nodes)", *n)
+	}
+	fmt.Fprintf(w, "  GPU:           %s x%d%s\n", a.Data.Environment.GPUType, a.Data.Environment.GPUCount, gpuNodes)
 	fmt.Fprintf(w, "  CPU:           %s x%d\n", a.Data.Environment.CPUModel, a.Data.Environment.CPUCores)
 	fmt.Fprintf(w, "  Memory:        %.2f GB (%d NUMA node(s))\n", a.Data.Environment.MemoryGB, a.Data.Environment.NUMANodes)
 	fmt.Fprintf(w, "  CUDA/Driver:   %s / %s\n", a.Data.Environment.CUDAVersion, a.Data.Environment.DriverVersion)
@@ -713,8 +717,19 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, bold("Pods:"))
 		for _, p := range a.Data.ExecutionMetadata.Pods {
-			fmt.Fprintf(w, "  %s  node=%s  ip=%s  start=%s  status=%s\n",
-				p.PodName, p.NodeName, p.PodIP, p.StartTime, formatPodStatus(p.Status, p.ExitCode))
+			gpus := ""
+			if p.GPUCount != nil {
+				gpus = fmt.Sprintf("  gpus=%d", *p.GPUCount)
+			}
+			fmt.Fprintf(w, "  %s  node=%s  ip=%s  start=%s  status=%s%s\n",
+				p.PodName, p.NodeName, p.PodIP, p.StartTime, formatPodStatus(p.Status, p.ExitCode), gpus)
+			for _, c := range p.Containers {
+				fmt.Fprintf(w, "    %s  image=%s", c.Name, c.Image)
+				if c.ImageID != "" && c.ImageID != c.Image {
+					fmt.Fprintf(w, "  id=%s", c.ImageID)
+				}
+				fmt.Fprintln(w)
+			}
 		}
 	}
 
