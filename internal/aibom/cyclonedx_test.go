@@ -194,8 +194,12 @@ func TestCycloneDXUnknownIntent(t *testing.T) {
 func TestCycloneDXSerialPrefersTriggerUID(t *testing.T) {
 	a := loadRecord(t, "aibom-serving-run.json")
 	obj(a.RawData["execution_metadata"])["trigger"] = map[string]any{"kind": "Job", "uid": "u-1"}
-	if got, want := convert(t, a)["serialNumber"], "urn:uuid:"+uuid5(cdxSerialNamespace, "u-1"); got != want {
+	doc := convert(t, a)
+	if got, want := doc["serialNumber"], "urn:uuid:"+uuid5(cdxSerialNamespace, "u-1"); got != want {
 		t.Errorf("serial = %v, want %v", got, want)
+	}
+	if got := props(obj(obj(doc["metadata"])["component"]))["aibomrun:job:triggerKind"]; got != "Job" {
+		t.Errorf("triggerKind = %q, want Job", got)
 	}
 	// The namespace UUID is uuid5(NAMESPACE_URL, project URL).
 	urlNS := [16]byte{0x6b, 0xa7, 0xb8, 0x11, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8}

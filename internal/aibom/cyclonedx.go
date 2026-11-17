@@ -856,6 +856,7 @@ func CycloneDX(a AIBOM) ([]byte, error) {
 	p.add("aibomrun:experiment:intent", data["experiment_intent"])
 	p.add("aibomrun:experiment:intent:declaredVia", data["experiment_intent_declared_via"])
 	p.add("aibomrun:job:name", em["job_id"])
+	p.add("aibomrun:job:triggerKind", obj(em["trigger"])["kind"])
 	p.add("aibomrun:job:status", em["status"])
 	p.add("aibomrun:job:durationSeconds", em["duration_seconds"])
 	p.add("aibomrun:job:nodeCount", env["node_count"])
