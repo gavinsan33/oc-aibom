@@ -1,0 +1,362 @@
+{
+  "apiVersion": "aibom.io/v1alpha1",
+  "kind": "AIBOM",
+  "metadata": {
+    "creationTimestamp": "2026-11-02T14:52:10Z",
+    "generateName": "aibom-vllm-benchmark-server-0-",
+    "generation": 1,
+    "labels": {
+      "aibom.io/job-name": "aibom-vllm-benchmark-server-0"
+    },
+    "name": "aibom-vllm-benchmark-server-0-j4vpg",
+    "namespace": "project-example",
+    "resourceVersion": "1",
+    "uid": "00000000-0000-0000-0000-000000000000"
+  },
+  "spec": {
+    "collectedAt": "2026-11-02T14:52:10Z",
+    "data": {
+      "_metadata": {
+        "aibom_version": "0.1.0",
+        "dataset_detection": "no datasets detected",
+        "generated_at": "2026-11-02T14:52:10Z",
+        "generator": "aibom-webhook postprocess",
+        "schema_compliance": "partial - focuses on reproducibility and telemetry fields"
+      },
+      "environment": {
+        "cpu": {
+          "cache_l3": "512 MiB",
+          "cpu_architecture": "x86_64",
+          "cpu_cores_per_socket": "128",
+          "cpu_threads_per_core": "2"
+        },
+        "cpu_cores": "512",
+        "cpu_model": "AMD EPYC 9754 128-Core Processor",
+        "cuda_version": "13.2",
+        "cudnn_version": "9.20.0",
+        "driver_version": "595.91.07",
+        "framework_version": "PyTorch 2.11.0a0+a6c236b9fd.nv26.03.46836102",
+        "gpu_count": 1,
+        "gpu_memory_mb": [
+          81559
+        ],
+        "gpu_type": "NVIDIA H100 80GB HBM3",
+        "kernel_config": {
+          "cpu_governor": "performance",
+          "max_map_count": "262144",
+          "numa_balancing": "1",
+          "transparent_hugepages": "always"
+        },
+        "kernel_version": "5.14.0-687.46.1.el9_8.x86_64",
+        "libraries": {
+          "flash-attn": "2.7.4.post1+git5231d95fe1.45164347",
+          "numpy": "2.1.0",
+          "safetensors": "0.7.0",
+          "tokenizers": "0.22.2",
+          "torch": "2.11.0a0+a6c236b9fd.nv26.3.46836102",
+          "torchvision": "0.25.0a0+b7d91027.nv26.3.46836102",
+          "transformers": "4.57.5",
+          "triton": "3.6.0+git5d72932fc5.nv26.3",
+          "vllm": "0.17.1+a03ca76a.nv26.3.46967107.cu132"
+        },
+        "memory_gb": 1511.38,
+        "nccl_version": "2.29.7",
+        "network": {
+          "primary_mtu": "1400",
+          "rdma_device_count": "6",
+          "rdma_devices": "mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5"
+        },
+        "numa_nodes": "2",
+        "python_version": "3.12.3",
+        "storage": {
+          "block_devices": "nvme0n1 894.3G\nnvme1n1     7T"
+        },
+        "torch_cuda_version": "13.2"
+      },
+      "execution_metadata": {
+        "duration_seconds": 620,
+        "job_id": "aibom-vllm-benchmark-server-0",
+        "namespace": "project-example",
+        "pods": [
+          {
+            "exit_code": 0,
+            "node_name": "node-1",
+            "pod_ip": "10.0.0.1",
+            "pod_name": "aibom-vllm-benchmark-server-0-0-25bpm",
+            "pod_namespace": "project-example",
+            "pod_uid": "00000000-0000-0000-0000-000000000001",
+            "start_time": "2026-11-02T14:41:43.885058",
+            "status": "Completed"
+          }
+        ],
+        "status": "DeadlineExceeded"
+      },
+      "experiment_description": null,
+      "experiment_intent": "inference",
+      "experiment_intent_declared_via": "annotation",
+      "experiment_name": "vllm-granite-benchmark",
+      "inference": {
+        "data_parallel_size": null,
+        "enable_expert_parallel": null,
+        "enable_prefix_caching": null,
+        "enforce_eager": null,
+        "gpu_memory_utilization": 0.6,
+        "max_model_len": 10000,
+        "max_num_seqs": null,
+        "max_tokens": null,
+        "performance": {
+          "collected_at": "2026-11-02T14:52:09.813189Z",
+          "metrics": {
+            "generation_throughput": {
+              "avg": 172.06,
+              "max": 305.33,
+              "min": 11.61,
+              "p95": 305.33,
+              "segments": {
+                "first_third": 13.96,
+                "last_third": 285.28,
+                "middle_third": 160.35
+              },
+              "unit": "tokens_per_sec"
+            },
+            "inter_token_latency_seconds": {
+              "avg": 0.0463,
+              "max": 0.068,
+              "min": 0.00967,
+              "p95": 0.068,
+              "segments": {
+                "first_third": 0.00967,
+                "last_third": 0.0563,
+                "middle_third": 0.068
+              },
+              "unit": "seconds"
+            },
+            "kv_cache_usage": {
+              "avg": 16.29,
+              "max": 64.9,
+              "min": 0,
+              "p95": 64.9,
+              "segments": {
+                "first_third": 0,
+                "last_third": 32.52,
+                "middle_third": 0.118
+              },
+              "unit": "percent"
+            },
+            "num_requests_running": {
+              "avg": 128.5,
+              "max": 512,
+              "min": 0,
+              "p95": 512,
+              "segments": {
+                "first_third": 0,
+                "last_third": 256.5,
+                "middle_third": 1
+              },
+              "unit": "requests"
+            },
+            "num_requests_waiting": {
+              "avg": 0,
+              "max": 0,
+              "min": 0,
+              "p95": 0,
+              "segments": {
+                "first_third": 0,
+                "last_third": 0,
+                "middle_third": 0
+              },
+              "unit": "requests"
+            },
+            "prompt_throughput": {
+              "avg": 514.52,
+              "max": 768.53,
+              "min": 29.85,
+              "p95": 768.53,
+              "segments": {
+                "first_third": 35.89,
+                "last_third": 711.08,
+                "middle_third": 698.31
+              },
+              "unit": "tokens_per_sec"
+            },
+            "time_to_first_token_seconds": {
+              "avg": 13.22,
+              "max": 19.4,
+              "min": 0.116,
+              "p95": 19.4,
+              "segments": {
+                "first_third": 0.116,
+                "last_third": 17.84,
+                "middle_third": 19.4
+              },
+              "unit": "seconds"
+            }
+          },
+          "summary_includes_cold_start": false
+        },
+        "pipeline_parallel_size": null,
+        "seed": null,
+        "served_model_name": null,
+        "serving_engine": "vllm",
+        "temperature": 0.7,
+        "tensor_parallel_size": null,
+        "top_k": 20,
+        "top_p": 0.9,
+        "trust_remote_code": null
+      },
+      "model": {
+        "architecture": null,
+        "dtype": null,
+        "framework": "vllm",
+        "name": "drawais/Granite-3.3-8B-Instruct-AWQ-INT4",
+        "quantization": "awq",
+        "quantization_bits": 4,
+        "speculative_decoding": {
+          "method": "ngram",
+          "num_speculative_tokens": 5,
+          "prompt_lookup_max": 4
+        },
+        "version": null
+      },
+      "resource_utilization": {
+        "collected_at": "2026-11-02T14:52:09.678929Z",
+        "metrics": {
+          "cpu_usage": {
+            "avg": 0.456,
+            "limit": 2,
+            "max": 0.757,
+            "min": 0.238,
+            "p95": 0.632,
+            "segments": {
+              "first_third": 0.292,
+              "last_third": 0.628,
+              "middle_third": 0.447
+            },
+            "unit": "cores"
+          },
+          "gpu_memory_used": {
+            "avg": 12124.3,
+            "max": 50786,
+            "min": 0,
+            "p95": 50784,
+            "segments": {
+              "first_third": 0,
+              "last_third": 31082,
+              "middle_third": 3832.62
+            },
+            "unit": "MiB"
+          },
+          "gpu_power": {
+            "avg": 113.09,
+            "max": 235.72,
+            "min": 70.01,
+            "p95": 232.66,
+            "segments": {
+              "first_third": 70.13,
+              "last_third": 161.09,
+              "middle_third": 104.35
+            },
+            "unit": "watts"
+          },
+          "gpu_utilization": {
+            "avg": 9.25,
+            "max": 80,
+            "min": 0,
+            "p95": 53,
+            "segments": {
+              "first_third": 0,
+              "last_third": 26.43,
+              "middle_third": 0
+            },
+            "unit": "percent"
+          },
+          "memory_usage": {
+            "avg": 2.48,
+            "limit": 8,
+            "max": 3.84,
+            "min": 1.17,
+            "p95": 3.84,
+            "segments": {
+              "first_third": 2.5,
+              "last_third": 2.64,
+              "middle_third": 2.27
+            },
+            "unit": "GiB"
+          },
+          "network_receive": {
+            "avg": 57.96,
+            "max": 143.33,
+            "min": 0,
+            "p95": 142.61,
+            "segments": {
+              "first_third": 0.00184,
+              "last_third": 97.6,
+              "middle_third": 76.28
+            },
+            "unit": "Mbps"
+          },
+          "network_transmit": {
+            "avg": 0.619,
+            "max": 1.4,
+            "min": 3.83e-06,
+            "p95": 1.4,
+            "segments": {
+              "first_third": 0.000122,
+              "last_third": 1.22,
+              "middle_third": 0.639
+            },
+            "unit": "Mbps"
+          },
+          "storage_read_throughput": {
+            "avg": 0,
+            "max": 0,
+            "min": 0,
+            "p95": 0,
+            "segments": {
+              "first_third": 0,
+              "last_third": 0,
+              "middle_third": 0
+            },
+            "unit": "MBps"
+          },
+          "storage_write_throughput": {
+            "avg": 7.14,
+            "max": 18.79,
+            "min": 0,
+            "p95": 18.19,
+            "segments": {
+              "first_third": 0,
+              "last_third": 15.95,
+              "middle_third": 4.74
+            },
+            "unit": "MBps"
+          }
+        },
+        "summary_includes_cold_start": false
+      },
+      "source_code": {
+        "declared_via": null,
+        "git_branch": null,
+        "git_commit": null,
+        "git_repository": null
+      },
+      "telemetry_series_ref": {
+        "kind": "AIBOMTelemetry",
+        "name": "aibom-vllm-benchmark-server-0-telemetry-6383e2ef",
+        "schema_version": 1,
+        "sha256": "08f6bc2387520e3e545ecdcf30397b68027566ba2fb9f249d1b776eea6fbf608",
+        "size_bytes": 10716,
+        "window": {
+          "end": 1793631124,
+          "start": 1793630503,
+          "step_seconds": 30
+        }
+      }
+    },
+    "experimentIntent": "inference",
+    "jobName": "aibom-vllm-benchmark-server-0",
+    "modelName": "drawais/Granite-3.3-8B-Instruct-AWQ-INT4",
+    "signature": "896/+1ogKbq0...redacted...",
+    "signaturePublicKey": "7gDMOGOVyQkE...redacted..."
+  }
+}

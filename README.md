@@ -50,6 +50,7 @@ oc aibomrun describe <name>               # readable summary, with signature che
 oc aibomrun compare <name> <name> [...]   # side-by-side fields and performance
 oc aibomrun diff <name-a> <name-b>        # only what differs
 oc aibomrun graph <name> [<name>...]      # stored telemetry, overlaid per run
+oc aibomrun export <name> -o cyclonedx    # CycloneDX 1.6 JSON on stdout
 ```
 
 It accepts the usual connection flags (`-n`, `-A`, `--context`, `--kubeconfig`, ...).

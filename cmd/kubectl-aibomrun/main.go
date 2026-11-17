@@ -195,7 +195,52 @@ func main() {
 	graphCmd.Flags().BoolVar(&graphText, "text", false, "print sparklines instead of opening the interactive full-screen view (automatic when stdout isn't a terminal)")
 	graphCmd.Flags().IntVar(&graphWidth, "width", 0, "text-mode graph width in columns (default: terminal width)")
 
-	root.AddCommand(listCmd, getCmd, diffCmd, compareCmd, graphCmd)
+	// Export formats, by -o value. CycloneDX is the only one so far.
+	exportFormats := map[string]func(aibom.AIBOM) ([]byte, error){
+		"cyclonedx": aibom.CycloneDX,
+	}
+	var exportFormat string
+	exportCmd := &cobra.Command{
+		Use:   "export <name> [-o cyclonedx]",
+		Short: "Export one AIBOM in another format (CycloneDX 1.6)",
+		Long: `Print one AIBOM in another format on stdout. Nothing is written to the
+cluster or to disk. Formats (-o): cyclonedx (default), a CycloneDX 1.6 JSON
+document following aibom-webhook-service's docs/reference/cyclonedx-mapping.md.
+The record's signature is checked as in describe; if it isn't valid, a warning
+goes to stderr and the document is still printed.`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completeAIBOMNames(configFlags, 1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			convert, ok := exportFormats[exportFormat]
+			if !ok {
+				return fmt.Errorf("unknown output format %q (supported formats: cyclonedx)", exportFormat)
+			}
+			client, namespace, err := buildClient(configFlags)
+			if err != nil {
+				return err
+			}
+			ctx := context.Background()
+			a, err := aibom.Get(ctx, client, namespace, args[0])
+			if err != nil {
+				return err
+			}
+			if r := aibom.Verify(ctx, client, a); r.Status != aibom.VerifyValid {
+				fmt.Fprintf(os.Stderr, "warning: record signature not verified: %s\n", r.Detail)
+			}
+			doc, err := convert(a)
+			if err != nil {
+				return err
+			}
+			_, err = os.Stdout.Write(doc)
+			return err
+		},
+	}
+	exportCmd.Flags().StringVarP(&exportFormat, "output", "o", "cyclonedx", "output format: cyclonedx")
+	_ = exportCmd.RegisterFlagCompletionFunc("output", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+		return []string{"cyclonedx"}, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	root.AddCommand(listCmd, getCmd, diffCmd, compareCmd, graphCmd, exportCmd)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
