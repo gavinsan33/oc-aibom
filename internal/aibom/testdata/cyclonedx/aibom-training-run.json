@@ -1,0 +1,349 @@
+{
+  "apiVersion": "aibom.io/v1alpha1",
+  "kind": "AIBOM",
+  "metadata": {
+    "creationTimestamp": "2026-11-03T16:40:14Z",
+    "generateName": "aibom-granite-lora-finetune-deepspeed-",
+    "generation": 1,
+    "labels": {
+      "aibom.io/job-name": "aibom-granite-lora-finetune-deepspeed"
+    },
+    "name": "aibom-granite-lora-finetune-deepspeed-czkzj",
+    "namespace": "project-example",
+    "resourceVersion": "1",
+    "uid": "00000000-0000-0000-0000-000000000000"
+  },
+  "spec": {
+    "collectedAt": "2026-11-03T16:40:14Z",
+    "data": {
+      "_metadata": {
+        "aibom_version": "0.1.0",
+        "dataset_detection": "enabled",
+        "generated_at": "2026-11-03T16:40:14Z",
+        "generator": "aibom-webhook postprocess",
+        "schema_compliance": "partial - focuses on reproducibility and telemetry fields"
+      },
+      "dataset": {
+        "auto_detected": [
+          {
+            "batch_size": 4,
+            "dataset_name": "tatsu-lab/alpaca",
+            "fingerprint": "a5048bbbf302198f",
+            "matches_declared": true,
+            "seen_via": [
+              "torch.utils.data.DataLoader"
+            ],
+            "source": "datasets.load_dataset",
+            "splits": [
+              "train"
+            ],
+            "version": "0.0.0"
+          }
+        ],
+        "declared": {
+          "declared_via": "cli_arg",
+          "license": null,
+          "name": "tatsu-lab/alpaca",
+          "source": null,
+          "version": null
+        }
+      },
+      "environment": {
+        "cpu": {
+          "cache_l3": "512 MiB",
+          "cpu_architecture": "x86_64",
+          "cpu_cores_per_socket": "128",
+          "cpu_threads_per_core": "2"
+        },
+        "cpu_cores": "512",
+        "cpu_model": "AMD EPYC 9754 128-Core Processor",
+        "cuda_version": "13.2",
+        "cudnn_version": "9.20.0",
+        "driver_version": "595.91.07",
+        "framework_version": "PyTorch 2.11.0a0+a6c236b9fd.nv26.03.46836102",
+        "gpu_count": 2,
+        "gpu_memory_mb": [
+          81559,
+          81559
+        ],
+        "gpu_type": "NVIDIA H100 80GB HBM3",
+        "kernel_config": {
+          "cpu_governor": "performance",
+          "max_map_count": "262144",
+          "numa_balancing": "1",
+          "transparent_hugepages": "always"
+        },
+        "kernel_version": "5.14.0-687.46.1.el9_8.x86_64",
+        "libraries": {
+          "accelerate": "1.15.0",
+          "datasets": "5.1.0",
+          "deepspeed": "0.19.9",
+          "flash-attn": "2.7.4.post1+git5231d95fe1.45164347",
+          "numpy": "2.1.0",
+          "peft": "0.21.2",
+          "safetensors": "0.8.0",
+          "tokenizers": "0.23.3",
+          "torch": "2.11.0a0+a6c236b9fd.nv26.3.46836102",
+          "torchao": "0.17.0+gitd9881220",
+          "torchvision": "0.25.0a0+b7d91027.nv26.3.46836102",
+          "transformers": "5.22.1",
+          "triton": "3.6.0+git5d72932fc5.nv26.3",
+          "trl": "1.17.1"
+        },
+        "memory_gb": 1511.38,
+        "nccl_version": "2.29.7",
+        "network": {
+          "primary_mtu": "1400",
+          "rdma_device_count": "6",
+          "rdma_devices": "mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5"
+        },
+        "numa_nodes": "2",
+        "python_version": "3.12.3",
+        "storage": {
+          "block_devices": "nvme0n1 894.3G\nnvme1n1     7T"
+        },
+        "torch_cuda_version": "13.2"
+      },
+      "execution_metadata": {
+        "duration_seconds": 607,
+        "job_id": "aibom-granite-lora-finetune-deepspeed",
+        "namespace": "project-example",
+        "pods": [
+          {
+            "exit_code": 0,
+            "node_name": "node-1",
+            "pod_ip": "10.0.0.1",
+            "pod_name": "aibom-granite-lora-finetune-deepspeed-kwdzq",
+            "pod_namespace": "project-example",
+            "pod_uid": "00000000-0000-0000-0000-000000000001",
+            "start_time": "2026-11-03T16:29:57.639439",
+            "status": "Completed"
+          }
+        ],
+        "status": "Completed"
+      },
+      "experiment_description": null,
+      "experiment_intent": "sft",
+      "experiment_intent_declared_via": "annotation",
+      "experiment_name": "granite-lora-sft-zero3-benchmark",
+      "fine_tuning": {
+        "adaptation_method": "lora",
+        "lora_alpha": 32,
+        "lora_rank": 16
+      },
+      "model": {
+        "architecture": "GraniteForCausalLM",
+        "dtype": "bfloat16",
+        "framework": "trl",
+        "name": "ibm-granite/granite-3.3-2b-instruct",
+        "quantization": null,
+        "quantization_bits": null,
+        "version": null
+      },
+      "resource_utilization": {
+        "collected_at": "2026-11-03T16:40:13.895344Z",
+        "metrics": {
+          "cpu_usage": {
+            "avg": 1.6,
+            "limit": 2,
+            "max": 1.99,
+            "min": 0.473,
+            "p95": 1.99,
+            "segments": {
+              "first_third": 0.955,
+              "last_third": 1.99,
+              "middle_third": 1.85
+            },
+            "unit": "cores"
+          },
+          "gpu_memory_used": {
+            "avg": 17368.1,
+            "max": 25596,
+            "min": 0,
+            "p95": 25588,
+            "segments": {
+              "first_third": 3479.38,
+              "last_third": 25231.08,
+              "middle_third": 23393.85
+            },
+            "unit": "MiB"
+          },
+          "gpu_power": {
+            "avg": 244.41,
+            "max": 278.39,
+            "min": 136.75,
+            "p95": 278.39,
+            "segments": {
+              "first_third": 198.74,
+              "last_third": 273.2,
+              "middle_third": 261.31
+            },
+            "unit": "watts"
+          },
+          "gpu_utilization": {
+            "avg": 23.49,
+            "max": 54,
+            "min": 0,
+            "p95": 54,
+            "segments": {
+              "first_third": 7.69,
+              "last_third": 24.08,
+              "middle_third": 38.69
+            },
+            "unit": "percent"
+          },
+          "memory_usage": {
+            "avg": 4.52,
+            "limit": 20,
+            "max": 6.34,
+            "min": 0,
+            "p95": 6.34,
+            "segments": {
+              "first_third": 2.18,
+              "last_third": 6.15,
+              "middle_third": 5.24
+            },
+            "unit": "GiB"
+          },
+          "network_receive": {
+            "avg": 65.19,
+            "max": 165.37,
+            "min": 1.33e-05,
+            "p95": 162.02,
+            "segments": {
+              "first_third": 107.39,
+              "last_third": 0.000108,
+              "middle_third": 88.18
+            },
+            "unit": "Mbps"
+          },
+          "network_transmit": {
+            "avg": 0.158,
+            "max": 0.399,
+            "min": 8.75e-06,
+            "p95": 0.391,
+            "segments": {
+              "first_third": 0.259,
+              "last_third": 6.98e-05,
+              "middle_third": 0.213
+            },
+            "unit": "Mbps"
+          },
+          "storage_read_throughput": {
+            "avg": 0,
+            "max": 0,
+            "min": 0,
+            "p95": 0,
+            "segments": {
+              "first_third": 0,
+              "last_third": 0,
+              "middle_third": 0
+            },
+            "unit": "MBps"
+          },
+          "storage_write_throughput": {
+            "avg": 11.47,
+            "max": 29.99,
+            "min": 0.00247,
+            "p95": 27.8,
+            "segments": {
+              "first_third": 24.37,
+              "last_third": 0.0597,
+              "middle_third": 12.27
+            },
+            "unit": "MBps"
+          }
+        },
+        "summary_includes_cold_start": false
+      },
+      "source_code": {
+        "declared_via": null,
+        "git_branch": null,
+        "git_commit": null,
+        "git_repository": null
+      },
+      "telemetry_series_ref": {
+        "kind": "AIBOMTelemetry",
+        "name": "aibom-granite-lora-finetune-deepspeed-telemetry-70b3e691",
+        "schema_version": 1,
+        "sha256": "310f8b483e5b0375072d42ca226d42f86f34d5fc9b199920275d757eac857711",
+        "size_bytes": 10509,
+        "window": {
+          "end": 1793724005,
+          "start": 1793723397,
+          "step_seconds": 30
+        }
+      },
+      "training": {
+        "batch_size": 4,
+        "determinism": {
+          "cudnn_benchmark": false,
+          "cudnn_deterministic": false,
+          "deterministic_algorithms": false,
+          "seeds": {
+            "numpy": 42,
+            "python": 42,
+            "torch": 42
+          }
+        },
+        "distributed": {
+          "deepspeed": {
+            "declared_via": "deepspeed_engine",
+            "offload_optimizer": "cpu",
+            "offload_param": "none",
+            "zero_stage": 3
+          },
+          "nodes": 1,
+          "processes_per_node": 2,
+          "strategies": [
+            "deepspeed"
+          ],
+          "world_declared_via": "environment",
+          "world_size": 2
+        },
+        "epochs": 1,
+        "learning_rate": 0.0002,
+        "lr_scheduler": {
+          "declared_via": "training_arguments",
+          "type": "linear",
+          "warmup_steps": 0
+        },
+        "mixed_precision": "bf16",
+        "mixed_precision_declared_via": "accelerator",
+        "optimizer": "adamw_torch_fused",
+        "optimizer_config": {
+          "class": "torch.optim.adamw.AdamW",
+          "declared_via": "runtime_optimizer",
+          "params": {
+            "amsgrad": false,
+            "betas": [
+              0.9,
+              0.999
+            ],
+            "capturable": false,
+            "decoupled_weight_decay": true,
+            "differentiable": false,
+            "eps": 1e-08,
+            "fused": true,
+            "lr": 0.0002,
+            "maximize": false,
+            "weight_decay": 0
+          }
+        },
+        "parallelization_strategy": "deepspeed",
+        "precision": {
+          "deepspeed": "bf16",
+          "float32_matmul_precision": "high",
+          "tf32_cudnn": true,
+          "tf32_matmul": true
+        },
+        "random_seed": 42
+      }
+    },
+    "experimentIntent": "sft",
+    "jobName": "aibom-granite-lora-finetune-deepspeed",
+    "modelName": "ibm-granite/granite-3.3-2b-instruct",
+    "signature": "vIAVLtPAg2C8...redacted...",
+    "signaturePublicKey": "7gDMOGOVyQkE...redacted..."
+  }
+}
