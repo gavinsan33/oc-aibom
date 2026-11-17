@@ -198,6 +198,13 @@ func TestCycloneDXSerialPrefersTriggerUID(t *testing.T) {
 	if got, want := doc["serialNumber"], "urn:uuid:"+uuid5(cdxSerialNamespace, "u-1"); got != want {
 		t.Errorf("serial = %v, want %v", got, want)
 	}
+	if got := str(obj(list(obj(obj(doc["metadata"])["tools"])["components"])[0])["version"]); got != "" {
+		t.Errorf("tool version = %q, want none for a record without generator_version", got)
+	}
+	obj(a.RawData["_metadata"])["generator_version"] = "0.3.0"
+	if got := str(obj(list(obj(obj(convert(t, a)["metadata"])["tools"])["components"])[0])["version"]); got != "0.3.0" {
+		t.Errorf("tool version = %q, want 0.3.0", got)
+	}
 	if got := props(obj(obj(doc["metadata"])["component"]))["aibomrun:job:triggerKind"]; got != "Job" {
 		t.Errorf("triggerKind = %q, want Job", got)
 	}

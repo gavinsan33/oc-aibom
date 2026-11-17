@@ -792,7 +792,7 @@ func printDescribe(w io.Writer, a aibom.AIBOM, verifyResult aibom.VerifyResult, 
 		fmt.Fprintln(w, bold("AIBOM Metadata:"))
 		fmt.Fprintf(w, "  Version:            %s\n", a.Data.Metadata.AIBOMVersion)
 		fmt.Fprintf(w, "  Generated At:       %s\n", a.Data.Metadata.GeneratedAt)
-		fmt.Fprintf(w, "  Generator:          %s\n", a.Data.Metadata.Generator)
+		fmt.Fprintf(w, "  Generator:          %s\n", strings.TrimSpace(a.Data.Metadata.Generator+" "+a.Data.Metadata.GeneratorVersion))
 	}
 }
 

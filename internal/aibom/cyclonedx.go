@@ -81,10 +81,10 @@ type cdxBOM struct {
 }
 
 type cdxMetadata struct {
-	Timestamp  string            `json:"timestamp,omitempty"`
-	Lifecycles []cdxLifecycle    `json:"lifecycles,omitempty"`
-	Tools      cdxTools          `json:"tools"`
-	Component  *cdxComponent     `json:"component"`
+	Timestamp  string         `json:"timestamp,omitempty"`
+	Lifecycles []cdxLifecycle `json:"lifecycles,omitempty"`
+	Tools      cdxTools       `json:"tools"`
+	Component  *cdxComponent  `json:"component"`
 }
 
 type cdxLifecycle struct {
@@ -96,8 +96,9 @@ type cdxTools struct {
 }
 
 type cdxTool struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
 }
 
 type cdxComponent struct {
@@ -979,7 +980,7 @@ func CycloneDX(a AIBOM) ([]byte, error) {
 		Version:     1,
 		Metadata: cdxMetadata{
 			Timestamp: str(obj(data["_metadata"])["generated_at"]),
-			Tools:     cdxTools{[]cdxTool{{"application", "aibom-webhook"}}},
+			Tools:     cdxTools{[]cdxTool{{"application", "aibom-webhook", str(obj(data["_metadata"])["generator_version"])}}},
 			Component: root,
 		},
 	}

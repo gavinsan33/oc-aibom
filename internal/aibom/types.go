@@ -496,4 +496,7 @@ type Metadata struct {
 	AIBOMVersion string `json:"aibom_version"`
 	GeneratedAt  string `json:"generated_at"`
 	Generator    string `json:"generator"`
+	// GeneratorVersion is the webhook release that built the record; empty
+	// for records from before it was recorded.
+	GeneratorVersion string `json:"generator_version"`
 }
