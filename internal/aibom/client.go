@@ -17,7 +17,7 @@ import (
 // against this GroupVersionResource.
 var GVR = schema.GroupVersionResource{
 	Group:    "aibom.io",
-	Version:  "v1alpha1",
+	Version:  "v1",
 	Resource: "aiboms",
 }
 

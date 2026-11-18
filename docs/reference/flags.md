@@ -6,4 +6,4 @@ For the filter and sort flags, see [list](../usage/list.md). For the chart flags
 
 ## Implementation notes
 
-There is no generated Go clientset for the `AIBOM` custom resource, since it is created directly from Python in `aibom-webhook-service`. The plugin therefore talks to the API through `k8s.io/client-go`'s dynamic client against `aibom.io/v1alpha1`, resource `aiboms`, and decodes `spec.data` into Go structs for typed filtering and diffing.
+There is no generated Go clientset for the `AIBOM` custom resource, since it is created directly from Python in `aibom-webhook-service`. The plugin therefore talks to the API through `k8s.io/client-go`'s dynamic client against `aibom.io/v1`, resource `aiboms`, and decodes `spec.data` into Go structs for typed filtering and diffing.

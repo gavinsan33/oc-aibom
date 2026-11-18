@@ -1,5 +1,5 @@
 {
-  "apiVersion": "aibom.io/v1alpha1",
+  "apiVersion": "aibom.io/v1",
   "kind": "AIBOM",
   "metadata": {
     "creationTimestamp": "2026-11-03T16:40:14Z",

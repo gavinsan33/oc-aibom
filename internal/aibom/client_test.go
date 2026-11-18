@@ -12,7 +12,7 @@ import (
 
 func newAIBOMObject(namespace, name, modelName string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": "aibom.io/v1alpha1",
+		"apiVersion": "aibom.io/v1",
 		"kind":       "AIBOM",
 		"metadata": map[string]any{
 			"name":      name,

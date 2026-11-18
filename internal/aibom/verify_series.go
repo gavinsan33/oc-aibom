@@ -65,7 +65,7 @@ type SeriesResult struct {
 // AIBOM's downsampled telemetry series.
 var TelemetryGVR = schema.GroupVersionResource{
 	Group:    "aibom.io",
-	Version:  "v1alpha1",
+	Version:  "v1",
 	Resource: "aibomtelemetries",
 }
 

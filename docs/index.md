@@ -1,6 +1,6 @@
 # oc-aibom
 
-A `kubectl`/`oc` plugin that makes it easier to filter through and compare [AIBOM](https://github.com/gavinsan33/aibom-webhook-service) (`aibom.io/v1alpha1`) custom resources than raw `oc get aibomrun -o yaml`, using only the standard Kubernetes API.
+A `kubectl`/`oc` plugin that makes it easier to filter through and compare [AIBOM](https://github.com/gavinsan33/aibom-webhook-service) (`aibom.io/v1`) custom resources than raw `oc get aibomrun -o yaml`, using only the standard Kubernetes API.
 
 Examples use `oc`, but `oc` is a superset of `kubectl` and both use the same plugin mechanism, so every command works identically with `kubectl`.
 
