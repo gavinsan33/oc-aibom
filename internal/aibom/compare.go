@@ -69,7 +69,7 @@ var compareFieldAccessors = []fieldAccessor{
 	{"Python Version", func(a AIBOM) string { return a.Data.Environment.PythonVersion }},
 	{"Torch CUDA Version", func(a AIBOM) string { return a.Data.Environment.TorchCUDAVersion }},
 	{"Libraries", func(a AIBOM) string { return a.Data.Environment.LibraryList() }},
-	{"AIBOM Version", func(a AIBOM) string { return a.Data.Metadata.AIBOMVersion }},
+	{"Record Format", func(a AIBOM) string { return a.Data.Metadata.AIBOMVersion }},
 }
 
 // training is the AIBOM's training block, or an empty one for an AIBOM
