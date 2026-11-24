@@ -21,8 +21,8 @@ Building from source needs Go 1.22 or later.
 
 ```
 cmd/kubectl-aibomrun/   CLI entrypoint: cobra commands, table and summary output, the interactive browser and graph views
-internal/aibom/         AIBOM types, dynamic-client queries, filter, sort and diff logic
-completion/             kubectl_complete-aibomrun and oc_complete-aibomrun companion scripts
+internal/aibom/         AIBOM types, dynamic-client queries, filter, sort, compare, signature checks and CycloneDX export
+completion/             kubectl_complete-aibomrun companion script, installed as both kubectl_complete-aibomrun and oc_complete-aibomrun
 plugins/aibomrun.yaml   krew manifest; this repo is its own krew index
 ```
 
@@ -30,9 +30,12 @@ plugins/aibomrun.yaml   krew manifest; this repo is its own krew index
 
 Push a `v*` tag. The `release` workflow builds the archives with `make dist`, publishes them and `checksums.txt` as a GitHub release, then commits the new version and sha256 values to `plugins/aibomrun.yaml` on `main`. Nothing needs editing by hand; `krew install oc-aibom/aibomrun` picks up the release once that commit lands.
 
-To try the krew manifest locally without a release:
+To try the krew manifest locally without a release, point a copy of it at the local archive's checksum (krew still checks the sha256 with `--archive`):
 
 ```sh
 make dist VERSION=v0.0.0-dev
-kubectl krew install --manifest=plugins/aibomrun.yaml --archive=dist/kubectl-aibomrun_v0.0.0-dev_linux_amd64.tar.gz
+archive=dist/kubectl-aibomrun_v0.0.0-dev_linux_amd64.tar.gz
+sha=$(sha256sum "$archive" | cut -d' ' -f1)
+sed "/linux_amd64/{n;s/sha256: .*/sha256: $sha/}" plugins/aibomrun.yaml > dist/aibomrun.yaml
+kubectl krew install --manifest=dist/aibomrun.yaml --archive="$archive"
 ```

@@ -2,7 +2,9 @@
 
 `oc-aibom` is built with `k8s.io/cli-runtime`'s `genericclioptions`, so it accepts the same connection flags `oc` and `kubectl` do: `--kubeconfig`, `--context`, `--namespace`/`-n`, `--server`, `--token`, and so on. No plugin-specific configuration is needed.
 
-For the filter and sort flags, see [list](../usage/list.md). For the chart flags, see [graph](../usage/graph.md#flags).
+`--no-color` turns off colored output. Color is also off when `NO_COLOR` is set or stdout isn't a terminal.
+
+For the filter and sort flags, see [list](../usage/list.md). For the chart flags, see [graph](../usage/graph.md#flags). `describe` takes `-b`/`--brief`, `compare` takes `--changed`, and `export` takes `-o`/`--output`.
 
 ## Implementation notes
 
