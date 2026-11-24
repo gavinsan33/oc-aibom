@@ -16,8 +16,11 @@ spec:
       kubectl aibomrun describe <name>
       kubectl aibomrun diff <name-a> <name-b>
       kubectl aibomrun compare <name> <name> [<name>...]
+      kubectl aibomrun graph <name> [<name>...]
+      kubectl aibomrun export <name> [-o cyclonedx]
   caveats: |
-    Requires read access to aiboms.aibom.io in the target namespace(s).
+    Requires read access to aiboms.aibom.io (and, for graph,
+    aibomtelemetries.aibom.io) in the target namespace(s).
   platforms:
   - selector:
       matchLabels:
