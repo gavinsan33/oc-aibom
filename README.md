@@ -82,5 +82,6 @@ keys; see [graph](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/grap
 - [describe](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/describe/): every section, and what each signature and telemetry status means
 - [diff and compare](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/diff-compare/)
 - [graph](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/graph/): the chart view, its keys, and text output
+- [export](https://gavinsan33.github.io/project-aibom/oc-aibom/usage/export/): CycloneDX output
 - [Flags](https://gavinsan33.github.io/project-aibom/oc-aibom/reference/flags/)
 - [Development](https://gavinsan33.github.io/project-aibom/oc-aibom/reference/development/): Makefile targets, project layout, releasing

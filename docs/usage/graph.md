@@ -70,8 +70,8 @@ Before charting, each run's series is checked against the digest in its signed A
 | `--metric <keys>` | Only graph these comma-separated metric keys, for example `gpu_utilization,memory_usage`. An unknown key lists the keys that exist. Default: all. |
 | `--pods` | Start with per-pod, per-GPU and per-container lines (toggle with `p`). |
 | `--text` | Print sparklines instead of opening the interactive view. |
-| `--width <n>` | Text-mode width in columns. Default: the terminal width. |
+| `--width <n>` | Text-mode width in columns. Default: the terminal width, or 80 when stdout isn't a terminal. |
 
-Metric keys are the ones stored in the series: `gpu_utilization`, `gpu_memory_used`, `gpu_power`, `cpu_usage`, `memory_usage`, `network_receive`, `network_transmit`, `storage_read_throughput` and `storage_write_throughput`, plus vLLM's `time_to_first_token_seconds`, `inter_token_latency_seconds`, `num_requests_running`, `num_requests_waiting`, `kv_cache_usage`, `prompt_throughput` and `generation_throughput` for inference runs.
+Metric keys are the ones stored in the series: `gpu_utilization`, `gpu_memory_used`, `gpu_power`, `cpu_usage`, `memory_usage`, `network_receive`, `network_transmit`, `storage_read_throughput` and `storage_write_throughput`, plus the serving engine's `time_to_first_token_seconds`, `inter_token_latency_seconds`, `num_requests_running`, `num_requests_waiting`, `kv_cache_usage`, `prompt_throughput` and `generation_throughput` for inference runs.
 
 Reading a series needs permission to `get` `aibomtelemetries`. The webhook chart's `aibom-view` ClusterRole grants it to anyone who can already view AIBOMs.

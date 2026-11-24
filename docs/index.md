@@ -11,8 +11,8 @@ Examples use `oc`, but `oc` is a superset of `kubectl` and both use the same plu
 | `oc aibomrun` | Interactive full-screen browser over the list — the default on a terminal; drill into describe, compare and graph |
 | `oc aibomrun list` | List AIBOMs with filters and performance sorting |
 | `oc aibomrun describe <name>` | Human-readable summary of one AIBOM, including signature status |
-| `oc aibomrun diff <name-a> <name-b>` | Field-by-field comparison of two AIBOMs |
-| `oc aibomrun compare <name> <name> [<name>...]` | Side-by-side performance table across runs |
+| `oc aibomrun diff <name-a> <name-b>` | Only the fields that differ between two AIBOMs (`compare --changed`) |
+| `oc aibomrun compare <name> <name> [<name>...]` | Side-by-side fields and performance across runs |
 | `oc aibomrun graph <name> [<name>...]` | Interactive terminal charts of the stored telemetry time series, with runs overlaid |
 | `oc aibomrun export <name> [-o cyclonedx]` | Print one AIBOM in another format on stdout; CycloneDX 1.6 JSON, the default, is the only one so far |
 

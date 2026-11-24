@@ -1,6 +1,6 @@
 # oc aibomrun list
 
-Lists AIBOMs with the fields you'd otherwise have to dig for in `-o yaml`: job, model, experiment intent, quantization, GPU type, and collection time.
+Lists AIBOMs with the fields you'd otherwise have to dig for in `-o yaml`: job, model, experiment intent, quantization, GPU type, age since collection, and status. Aliases: `ls`, `get`.
 
 ```sh
 oc aibomrun list -n my-namespace
@@ -13,7 +13,7 @@ oc aibomrun list --framework=vllm              # filter by model.framework
 oc aibomrun list --gpu-type=A100               # filter by environment.gpu_type
 oc aibomrun list --job=my-training-job         # filter by job name
 oc aibomrun list --git-branch=main             # filter by source_code.git_branch
-oc aibomrun list --git-repository=my-org/repo  # filter by source_code.git_repository
+oc aibomrun list --git-repository=https://github.com/my-org/repo  # filter by source_code.git_repository
 oc aibomrun list --serving-engine=vllm         # filter by inference.serving_engine
 oc aibomrun list --adaptation-method=lora      # filter by fine_tuning.adaptation_method
 oc aibomrun list --optimizer=adamw             # filter by training.optimizer
@@ -46,12 +46,12 @@ The sort you last applied from this menu is remembered (in `~/.config/oc-aibom/p
 
 In the **filter** prompt: type to narrow the list live (a case-insensitive substring over the visible columns), `enter` keeps the filter, `esc` clears it.
 
-Inside the describe/compare/graph pages, a `[d] Detail view` / `[g] Graph view` tab bar shows where you are; `d` and `g` switch between the two views of the same subject, and `q`/`esc` backs out to the list.
+Inside the describe/compare/graph pages, a `[d] Detail view` / `[g] Graph view` tab bar shows where you are; `d` and `g` switch between the two views of the same subject, and `q`/`esc` backs out to the list. On a compare page, `c` toggles showing only the changed fields.
 
 ## Filtering
 
-All filters are exact-match and case-insensitive, and can be combined. Combined filters are AND'd together.
+All filters are exact-match and case-insensitive, and can be combined. Combined filters are AND'd together. `--model` without an org also matches the last part of an `org/model` name, so `--model=granite-3.3-2b-instruct` finds `ibm-granite/granite-3.3-2b-instruct`.
 
 ## Sorting
 
-`--sort-by` accepts `gpu-utilization`, `gpu-memory`, `gpu-power`, `cpu-usage`, `memory-usage`, `network-rx` and `network-tx`. It adds the corresponding column to the table. Add `--ascending` to put the lowest value first.
+The default sort is `age`, oldest first. `--sort-by` also accepts `gpu-utilization`, `gpu-memory`, `gpu-power`, `cpu-usage`, `memory-usage`, `network-rx` and `network-tx`, highest first, and adds the corresponding column to the table. Add `--ascending` to reverse either order (lowest value, or most recent, first).

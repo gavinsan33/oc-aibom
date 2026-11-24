@@ -10,14 +10,18 @@ oc aibomrun compare <name> <name> --changed
 A side-by-side comparison of two or more AIBOMs, matching the console plugin's
 compare view. It prints two tables:
 
-- **Fields** — one row per compared field (job, model config, dataset
-  declaration and drift, git provenance, hardware/driver environment, AIBOM
-  version), one column per run. Fields whose values aren't identical across
-  every run are marked with `*`.
-- **Hardware Performance** — one row per metric (GPU utilization, memory and
-  power, CPU and memory usage, network RX/TX, storage read/write), one column
-  per run. When exactly two AIBOMs are compared, `DELTA` and `CHANGE` columns
-  quantify the second relative to the first (sign-colored).
+- **Fields** — one row per compared field (job and intent, model config,
+  dataset declaration and drift, git provenance, training setup,
+  hardware/driver/library environment, record format), one column per run.
+  Fields whose values aren't identical across every run are marked with `*`.
+- **Hardware Performance** — a Runtime row, then one row per metric (GPU
+  utilization, memory and power, CPU and memory usage, network RX/TX, storage
+  read/write), one column per run. When exactly two AIBOMs are compared,
+  `DELTA` and `CHANGE` columns quantify the second relative to the first
+  (sign-colored).
+
+When any run has serving-engine telemetry, a third **Inference Performance**
+table follows, laid out the same way.
 
 `--changed` hides the field rows that are identical across runs, leaving only
 what differs.

@@ -6,21 +6,27 @@ oc aibomrun describe <name>
 
 Prints a human-readable summary of a single AIBOM instead of a raw YAML dump:
 
+- job, intent, runtime, status, and signature and telemetry-series checks
 - model
 - dataset, declared versus auto-detected, flagging mismatches
 - source provenance
+- training, fine-tuning or inference settings, where present
 - environment
-- resource utilization (GPU, CPU, memory and network averages)
+- pods and their container images
+- hardware performance (GPU, CPU, memory, network and storage)
+- AIBOM metadata
+
+`-b`/`--brief` leaves out the pod list, the performance detail tables (showing only each metric's average) and the AIBOM metadata.
 
 ## Performance detail
 
-If the AIBOM was compiled with per-metric detail, a "Performance Detail" section shows each metric's min, avg, max and p95, and its first, middle and last-third breakdown across the run. Use `oc aibomrun graph` to see the full time series.
+The "Hardware Performance" section shows each metric's min, avg, max, limit and p95, and its first, middle and last-third breakdown across the run. MAX is yellow within 10% of the limit and red at or above it. Use `oc aibomrun graph` to see the full time series.
 
 ## Inference performance
 
-For an inference AIBOM whose serving engine has its own telemetry (vLLM today), an "Inference Performance" section shows the serving-level metrics: time to first token, inter-token latency, queue depth, KV-cache usage and throughput. It uses the same min, avg, max, p95 and segment detail.
+For an inference AIBOM whose serving engine has its own telemetry (vLLM, TGI, SGLang or LMDeploy), an "Inference Performance" section shows the serving-level metrics: time to first token, inter-token latency, queue depth, KV-cache usage and throughput. It uses the same min, avg, max, p95 and segment detail. Engines export different subsets: TGI has no time to first token or KV-cache metric.
 
-This section is separate from resource utilization because it describes the serving application's behavior, not the hardware underneath. It's absent on an AIBOM that predates the field, or whose serving engine isn't covered yet.
+This section is separate from Hardware Performance because it describes the serving application's behavior, not the hardware underneath. It's absent on an AIBOM that predates the field, or whose serving engine isn't covered yet.
 
 ## Pre-pulled models
 
